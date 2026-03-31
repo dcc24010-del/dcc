@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Search, Filter, Calendar as CalendarIcon, CheckCircle, History as HistoryIcon, MessageCircle } from "lucide-react";
 import { buildPaymentWhatsAppUrl } from "@/lib/whatsapp";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -278,128 +280,161 @@ export default function Income() {
             )
         }
     >
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
-                <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                        placeholder="Search student or batch..." 
-                        className="pl-9 bg-background" 
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Filter className="w-4 h-4" />
-                    <span>{filteredIncomes?.length || 0} records found</span>
+        <div className="space-y-4">
+            {/* Search bar */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
+                    <div className="relative w-full sm:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search student or batch..."
+                            className="pl-9 bg-background"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Filter className="w-4 h-4" />
+                        <span>{filteredIncomes?.length || 0} records found</span>
+                    </div>
                 </div>
             </div>
 
-            <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Month</TableHead>
-                    {isAdmin && <TableHead>Added By</TableHead>}
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="w-[90px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">Loading...</TableCell>
-                    </TableRow>
-                  ) : filteredIncomes?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">No records found.</TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredIncomes?.map((inc: any) => (
-                      <TableRow 
-                        key={inc.id} 
-                        className={`group transition-colors ${
-                          inc.status === 'Pending' 
-                            ? 'bg-amber-500/5 hover:bg-amber-500/10' 
-                            : inc.status === 'Verified'
-                            ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
-                            : 'hover:bg-muted/30'
-                        }`}
-                      >
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              {inc.student?.name}
-                              {inc.status === 'Pending' && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Pending</span>
-                              )}
-                              {inc.status === 'Verified' && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                  <CheckCircle className="w-2.5 h-2.5" />
-                                  Verified
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                            {inc.batch?.name}
-                          </span>
-                        </TableCell>
-                        <TableCell>{inc.month}</TableCell>
-                        {isAdmin && <TableCell>{inc.addedBy || "N/A"}</TableCell>}
-                        <TableCell className="text-muted-foreground text-sm">{format(new Date(inc.date), "MMM d, y")}</TableCell>
-                        <TableCell className="text-right font-medium text-emerald-600">
-                          <div className="flex items-center justify-end gap-3">
-                            +৳{inc.amount.toLocaleString()}
-                            {isAdmin && inc.status === 'Pending' && (
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                className="h-7 text-[10px] bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 hover:text-white"
-                                onClick={() => verifyMutation.mutate(inc.id)}
-                                disabled={verifyMutation.isPending}
-                              >
-                                {verifyMutation.isPending ? "..." : "Verify"}
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100">
-                            {isAdmin && inc.student?.mobileNumber && (() => {
-                              const url = buildPaymentWhatsAppUrl(
-                                inc.student.mobileNumber,
-                                inc.amount,
-                                inc.student.name,
-                                inc.month
-                              );
-                              return url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="icon" className="text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
-                                    <MessageCircle className="w-4 h-4" />
-                                  </Button>
-                                </a>
-                              ) : null;
-                            })()}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive"
-                              onClick={() => handleDelete(inc.id)}
+            {/* Class-wise grouped accordion */}
+            {isLoading ? (
+                <div className="bg-card rounded-2xl border border-border shadow-sm p-12 text-center text-muted-foreground">
+                    Loading...
+                </div>
+            ) : !filteredIncomes || filteredIncomes.length === 0 ? (
+                <div className="bg-card rounded-2xl border border-border shadow-sm p-12 text-center text-muted-foreground">
+                    No records found.
+                </div>
+            ) : (() => {
+                // Group by batchId, preserving insertion order
+                const groups: Record<number, { batchName: string; records: IncomeWithRelations[] }> = {};
+                filteredIncomes.forEach((inc: any) => {
+                    const bId = inc.batchId as number;
+                    if (!groups[bId]) groups[bId] = { batchName: inc.batch?.name ?? `Batch ${bId}`, records: [] };
+                    groups[bId].records.push(inc);
+                });
+                const groupEntries = Object.entries(groups);
+                const defaultOpen = groupEntries.map(([id]) => id);
+                return (
+                    <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-3">
+                        {groupEntries.map(([batchId, { batchName, records }]) => (
+                            <AccordionItem
+                                key={batchId}
+                                value={batchId}
+                                className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-            </Table>
+                                <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/30 [&[data-state=open]]:bg-muted/20">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold text-base text-foreground">Class {batchName}</span>
+                                        <Badge variant="secondary" className="text-xs font-semibold">
+                                            {records.length} record{records.length !== 1 ? "s" : ""}
+                                        </Badge>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="p-0">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableHead>Student Name</TableHead>
+                                                <TableHead>Batch</TableHead>
+                                                <TableHead>Month</TableHead>
+                                                {isAdmin && <TableHead>Added By</TableHead>}
+                                                <TableHead>Date</TableHead>
+                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead className="w-[90px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {records.map((inc: any) => (
+                                                <TableRow
+                                                    key={inc.id}
+                                                    className={`group transition-colors ${
+                                                        inc.status === 'Pending'
+                                                            ? 'bg-amber-500/5 hover:bg-amber-500/10'
+                                                            : inc.status === 'Verified'
+                                                            ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
+                                                            : 'hover:bg-muted/30'
+                                                    }`}
+                                                >
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center gap-2">
+                                                            {inc.student?.name}
+                                                            {inc.status === 'Pending' && (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Pending</span>
+                                                            )}
+                                                            {inc.status === 'Verified' && (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                                    <CheckCircle className="w-2.5 h-2.5" />
+                                                                    Verified
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                                                            {inc.batch?.name}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>{inc.month}</TableCell>
+                                                    {isAdmin && <TableCell>{inc.addedBy || "N/A"}</TableCell>}
+                                                    <TableCell className="text-muted-foreground text-sm">{format(new Date(inc.date), "MMM d, y")}</TableCell>
+                                                    <TableCell className="text-right font-medium text-emerald-600">
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            +৳{inc.amount.toLocaleString()}
+                                                            {isAdmin && inc.status === 'Pending' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 text-[10px] bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 hover:text-white"
+                                                                    onClick={() => verifyMutation.mutate(inc.id)}
+                                                                    disabled={verifyMutation.isPending}
+                                                                >
+                                                                    {verifyMutation.isPending ? "..." : "Verify"}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100">
+                                                            {isAdmin && inc.student?.mobileNumber && (() => {
+                                                                const url = buildPaymentWhatsAppUrl(
+                                                                    inc.student.mobileNumber,
+                                                                    inc.amount,
+                                                                    inc.student.name,
+                                                                    inc.month
+                                                                );
+                                                                return url ? (
+                                                                    <a href={url} target="_blank" rel="noopener noreferrer">
+                                                                        <Button variant="ghost" size="icon" className="text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
+                                                                            <MessageCircle className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </a>
+                                                                ) : null;
+                                                            })()}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-destructive"
+                                                                onClick={() => handleDelete(inc.id)}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                );
+            })()}
         </div>
     </Layout>
   );
