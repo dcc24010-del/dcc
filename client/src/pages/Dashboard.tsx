@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQuery } from "@tanstack/react-query";
 import { type User } from "@/lib/schemas";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useEffect } from "react";
@@ -278,53 +279,83 @@ export default function Dashboard() {
           )}
         </div>
 
-        {monthlyData.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-2 h-8 bg-emerald-500 rounded-full" />
-              <h2 className="text-2xl font-bold">Monthly Overview</h2>
+        {monthlyData.length > 0 && (() => {
+          const currentMonthName = MONTHS_FULL[new Date().getMonth()];
+          const defaultOpen = monthlyData.filter(m => m.month === currentMonthName).map(m => m.month);
+          return (
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-2 h-8 bg-emerald-500 rounded-full" />
+                <h2 className="text-2xl font-bold">Monthly Overview</h2>
+              </div>
+              <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-3">
+                {monthlyData.map(month => {
+                  const isCurrentMonth = month.month === currentMonthName;
+                  return (
+                    <AccordionItem
+                      key={month.month}
+                      value={month.month}
+                      className="border-none bg-white dark:bg-slate-900 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.08)] rounded-2xl overflow-hidden"
+                    >
+                      <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800/50 [&[data-state=open]]:bg-gradient-to-br [&[data-state=open]]:from-slate-50 [&[data-state=open]]:to-slate-100 dark:[&[data-state=open]]:from-slate-900 dark:[&[data-state=open]]:to-slate-800 border-b border-slate-100 dark:border-slate-800 transition-colors duration-200">
+                        <div className="flex items-center justify-between w-full pr-3">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{month.month}</h3>
+                            {isCurrentMonth && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-slate-400 dark:text-slate-500 text-xs hidden sm:inline">
+                              ৳{month.totalIncome.toLocaleString()} in · ৳{month.totalExpense.toLocaleString()} out
+                            </span>
+                            <span className={`font-bold text-sm ${month.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-500 dark:text-red-400'}`}>
+                              Balance: ৳{month.balance.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-3">
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-emerald-200 dark:border-emerald-800/30">
+                            <div className="p-1.5 rounded-lg bg-emerald-500/20 mb-1.5">
+                              <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider mb-1">Income</p>
+                            <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 w-full text-center">৳{month.totalIncome.toLocaleString()}</p>
+                          </div>
+                          <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-rose-200 dark:border-rose-800/30">
+                            <div className="p-1.5 rounded-lg bg-rose-500/20 mb-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                            </div>
+                            <p className="text-[10px] font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider mb-1">Expenses</p>
+                            <p className="text-sm font-extrabold text-rose-600 dark:text-rose-400 w-full text-center">৳{month.totalExpense.toLocaleString()}</p>
+                          </div>
+                          <div className={`bg-gradient-to-br ${month.balance >= 0 ? 'from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 border border-indigo-200 dark:border-indigo-800/30' : 'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800/30'} rounded-xl p-3 flex flex-col items-center justify-center text-center`}>
+                            <div className={`p-1.5 rounded-lg ${month.balance >= 0 ? 'bg-indigo-500/20' : 'bg-red-500/20'} mb-1.5`}>
+                              <BarChart3 className={`w-3.5 h-3.5 ${month.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}`} />
+                            </div>
+                            <p className={`text-[10px] font-bold ${month.balance >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-red-700 dark:text-red-300'} uppercase tracking-wider mb-1`}>Balance</p>
+                            <p className={`text-sm font-extrabold ${month.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'} w-full text-center`}>৳{Math.abs(month.balance).toLocaleString()}</p>
+                          </div>
+                          <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-orange-200 dark:border-orange-800/30">
+                            <div className="p-1.5 rounded-lg bg-orange-500/20 mb-1.5">
+                              <GraduationCap className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <p className="text-[10px] font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wider mb-1">Paid</p>
+                            <p className="text-sm font-extrabold text-orange-600 dark:text-orange-400 w-full text-center">{month.paidStudentsCount}</p>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {monthlyData.map(month => (
-                <Card key={month.month} className="border-none bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_-2px_rgba(0,0,0,0.12)] transition-all duration-300 rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 py-4 px-6 border-b border-slate-200 dark:border-slate-700">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{month.month}</h3>
-                  </CardHeader>
-                  <CardContent className="p-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-emerald-200 dark:border-emerald-800/30">
-                      <div className="p-1.5 rounded-lg bg-emerald-500/20 mb-1.5">
-                        <Wallet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider mb-1">Income</p>
-                      <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 w-full text-center">৳{month.totalIncome.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-rose-200 dark:border-rose-800/30">
-                      <div className="p-1.5 rounded-lg bg-rose-500/20 mb-1.5">
-                        <CreditCard className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                      </div>
-                      <p className="text-[10px] font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider mb-1">Expenses</p>
-                      <p className="text-sm font-extrabold text-rose-600 dark:text-rose-400 w-full text-center">৳{month.totalExpense.toLocaleString()}</p>
-                    </div>
-                    <div className={`bg-gradient-to-br ${month.balance >= 0 ? 'from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 border border-indigo-200 dark:border-indigo-800/30' : 'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border border-red-200 dark:border-red-800/30'} rounded-xl p-3 flex flex-col items-center justify-center text-center`}>
-                      <div className={`p-1.5 rounded-lg ${month.balance >= 0 ? 'bg-indigo-500/20' : 'bg-red-500/20'} mb-1.5`}>
-                        <BarChart3 className={`w-3.5 h-3.5 ${month.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}`} />
-                      </div>
-                      <p className={`text-[10px] font-bold ${month.balance >= 0 ? 'text-indigo-700 dark:text-indigo-300' : 'text-red-700 dark:text-red-300'} uppercase tracking-wider mb-1`}>Balance</p>
-                      <p className={`text-sm font-extrabold ${month.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'} w-full text-center`}>৳{Math.abs(month.balance).toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-3 flex flex-col items-center justify-center text-center border border-orange-200 dark:border-orange-800/30">
-                      <div className="p-1.5 rounded-lg bg-orange-500/20 mb-1.5">
-                        <GraduationCap className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-                      </div>
-                      <p className="text-[10px] font-bold text-orange-700 dark:text-orange-300 uppercase tracking-wider mb-1">Paid</p>
-                      <p className="text-sm font-extrabold text-orange-600 dark:text-orange-400 w-full text-center">{month.paidStudentsCount}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 bg-indigo-500 rounded-full" />
           <h2 className="text-2xl font-bold">Batch Tracking</h2>
