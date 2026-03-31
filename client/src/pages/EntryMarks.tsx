@@ -74,6 +74,8 @@ export default function EntryMarks() {
   const [subject, setSubject] = useState("");
   const [totalMarks, setTotalMarks] = useState("100");
   const [marks, setMarks] = useState<Record<number, string>>({});
+  const [singleAbsents, setSingleAbsents] = useState<Record<number, boolean>>({});
+  const [markErrors, setMarkErrors] = useState<Record<number, string>>({});
 
   const [modelBatchId, setModelBatchId] = useState("");
   const [modelExamName, setModelExamName] = useState("");
@@ -148,16 +150,27 @@ export default function EntryMarks() {
       toast({ variant: "destructive", title: "Missing fields", description: "Please fill in all exam details" });
       return;
     }
-    const entries = Object.entries(marks).filter(([, v]) => v !== "");
-    if (entries.length === 0) {
+    const hasErrors = Object.values(markErrors).some((e) => e !== "");
+    if (hasErrors) {
+      toast({ variant: "destructive", title: "Fix validation errors before saving" });
+      return;
+    }
+    const absentEntries = filteredStudents
+      .filter((s) => singleAbsents[s.id])
+      .map((s) => ({ studentId: s.id, obtainedMarks: -1 }));
+    const markEntries = Object.entries(marks)
+      .filter(([, v]) => v !== "")
+      .map(([id, v]) => ({ studentId: Number(id), obtainedMarks: Number(v) }));
+    const allEntries = [...absentEntries, ...markEntries.filter((e) => !singleAbsents[e.studentId])];
+    if (allEntries.length === 0) {
       toast({ variant: "destructive", title: "No marks entered" });
       return;
     }
     let saved = 0;
-    entries.forEach(([studentId, obtainedMarks]) => {
+    allEntries.forEach(({ studentId, obtainedMarks }) => {
       createResultMutation.mutate(
-        { studentId: Number(studentId), batchId: Number(selectedBatchId), examName, subject, totalMarks: Number(totalMarks), obtainedMarks: Number(obtainedMarks), isModelTest: false },
-        { onSuccess: () => { saved++; if (saved === entries.length) { toast({ title: "Marks saved successfully" }); setMarks({}); } } }
+        { studentId, batchId: Number(selectedBatchId), examName, subject, totalMarks: Number(totalMarks), obtainedMarks, isModelTest: false },
+        { onSuccess: () => { saved++; if (saved === allEntries.length) { toast({ title: "Marks saved successfully" }); setMarks({}); setSingleAbsents({}); setMarkErrors({}); } } }
       );
     });
   };
@@ -451,7 +464,12 @@ export default function EntryMarks() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Students List</CardTitle>
-                      <Button onClick={handleSaveMarks} disabled={createResultMutation.isPending}>Save All Marks</Button>
+                      <Button
+                        onClick={handleSaveMarks}
+                        disabled={createResultMutation.isPending || Object.values(markErrors).some((e) => e !== "")}
+                      >
+                        Save All Marks
+                      </Button>
                     </CardHeader>
                     <CardContent>
                       <Table>
@@ -459,19 +477,61 @@ export default function EntryMarks() {
                           <TableRow>
                             <TableHead>Student ID</TableHead>
                             <TableHead>Name</TableHead>
-                            <TableHead className="w-[200px]">Obtained Marks</TableHead>
+                            <TableHead className="w-[240px]">Obtained Marks</TableHead>
+                            <TableHead className="w-[80px] text-center">Absent</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredStudents.map((student) => (
-                            <TableRow key={student.id}>
-                              <TableCell>{student.studentCustomId || "N/A"}</TableCell>
-                              <TableCell>{student.name}</TableCell>
-                              <TableCell>
-                                <Input type="number" placeholder="Marks" value={marks[student.id] || ""} onChange={(e) => setMarks((p) => ({ ...p, [student.id]: e.target.value }))} />
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {filteredStudents.map((student) => {
+                            const isAbsent = !!singleAbsents[student.id];
+                            const errorMsg = markErrors[student.id] || "";
+                            return (
+                              <TableRow key={student.id}>
+                                <TableCell>{student.studentCustomId || "N/A"}</TableCell>
+                                <TableCell>{student.name}</TableCell>
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <Input
+                                      type={isAbsent ? "text" : "number"}
+                                      placeholder={isAbsent ? "ABS" : "Marks"}
+                                      value={isAbsent ? "ABS" : (marks[student.id] || "")}
+                                      disabled={isAbsent}
+                                      min={0}
+                                      max={Number(totalMarks) || undefined}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setMarks((p) => ({ ...p, [student.id]: val }));
+                                        const num = Number(val);
+                                        const max = Number(totalMarks);
+                                        if (val !== "" && max > 0 && num > max) {
+                                          setMarkErrors((p) => ({ ...p, [student.id]: `Marks cannot exceed ${max}` }));
+                                        } else {
+                                          setMarkErrors((p) => ({ ...p, [student.id]: "" }));
+                                        }
+                                      }}
+                                      className={errorMsg ? "border-red-500 focus-visible:ring-red-400" : ""}
+                                    />
+                                    {errorMsg && (
+                                      <p className="text-xs text-red-500 font-medium">{errorMsg}</p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox
+                                    checked={isAbsent}
+                                    onCheckedChange={(checked) => {
+                                      setSingleAbsents((p) => ({ ...p, [student.id]: !!checked }));
+                                      if (checked) {
+                                        setMarks((p) => ({ ...p, [student.id]: "" }));
+                                        setMarkErrors((p) => ({ ...p, [student.id]: "" }));
+                                      }
+                                    }}
+                                    data-testid={`checkbox-absent-${student.id}`}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </CardContent>
@@ -572,7 +632,10 @@ export default function EntryMarks() {
                                                   <TableCell className="font-medium text-sm py-2.5">{res.student?.name || "—"}</TableCell>
                                                   <TableCell className="text-sm py-2.5 text-slate-600">{res.subject}</TableCell>
                                                   <TableCell className="text-sm py-2.5 text-center font-bold">
-                                                    {res.obtainedMarks}<span className="text-slate-400 font-normal">/{res.totalMarks}</span>
+                                                    {res.obtainedMarks === -1
+                                                      ? <span className="text-amber-600 font-bold">ABS</span>
+                                                      : <>{res.obtainedMarks}<span className="text-slate-400 font-normal">/{res.totalMarks}</span></>
+                                                    }
                                                   </TableCell>
                                                   <TableCell className="py-2.5">
                                                     <div className="flex items-center gap-0.5 justify-end">
@@ -651,9 +714,14 @@ export default function EntryMarks() {
                               <TableCell className="py-5 px-6 font-bold text-[#1E293B]">{res.examName}</TableCell>
                               <TableCell className="py-5 px-6 font-medium text-[#1E293B]">{res.subject}</TableCell>
                               <TableCell className="py-5 px-6 text-[#64748B] font-bold">{res.totalMarks}</TableCell>
-                              <TableCell className="py-5 px-6"><span className="font-black text-lg text-emerald-600">{res.obtainedMarks}</span></TableCell>
                               <TableCell className="py-5 px-6">
-                                <Badge className={`font-bold text-white ${gradeColor(grade)}`}>{grade} ({gp.toFixed(2)})</Badge>
+                                {res.obtainedMarks === -1
+                                  ? <span className="font-black text-lg text-amber-600">ABS</span>
+                                  : <span className="font-black text-lg text-emerald-600">{res.obtainedMarks}</span>
+                                }
+                              </TableCell>
+                              <TableCell className="py-5 px-6">
+                                <Badge className={`font-bold text-white ${gradeColor(grade)}`}>{grade}{grade !== "ABS" ? ` (${gp.toFixed(2)})` : ""}</Badge>
                               </TableCell>
                             </TableRow>
                           );
