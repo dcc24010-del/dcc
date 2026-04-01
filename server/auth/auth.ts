@@ -2,8 +2,10 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
+import { pool } from "../db";
 import { type User as SelectUser } from "@shared/schema";
 
 declare global {
@@ -13,13 +15,21 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
+  const PgStore = connectPgSimple(session);
+
   const sessionSettings: session.SessionOptions = {
+    store: new PgStore({
+      pool,
+      createTableIfMissing: true,
+    }),
     secret: process.env.SESSION_SECRET || "tuition-track-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    }
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
   };
 
   app.use(session(sessionSettings));
