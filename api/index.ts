@@ -22,7 +22,15 @@ app.use((req, _res, next) => {
   next();
 });
 
+let initError: Error | null = null;
+
 const initPromise = (async () => {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is not configured. Go to Vercel → Project Settings → Environment Variables and add DATABASE_URL with your Supabase connection string."
+    );
+  }
+
   await registerRoutes(httpServer, app);
 
   const distPath = path.join(process.cwd(), "dist", "public");
@@ -31,17 +39,43 @@ const initPromise = (async () => {
     app.use("/{*path}", (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
+  } else {
+    app.use("/{*path}", (_req: Request, res: Response) => {
+      res.status(200).json({
+        status: "API running",
+        note: "Frontend assets not found. Ensure npm run build ran and dist/public is included.",
+      });
+    });
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (res.headersSent) return;
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    console.error("[Express error]", err);
     res.status(status).json({ message });
   });
-})();
+})().catch((err: Error) => {
+  initError = err;
+  console.error("[FATAL] Initialization failed:", err.message);
+});
 
 export default async function handler(req: Request, res: Response) {
-  await initPromise;
-  app(req, res);
+  try {
+    await initPromise;
+
+    if (initError) {
+      return res.status(500).json({
+        error: "Server failed to initialize",
+        message: initError.message,
+      });
+    }
+
+    app(req, res);
+  } catch (err: any) {
+    console.error("[Handler error]", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Unexpected error", message: err?.message });
+    }
+  }
 }
