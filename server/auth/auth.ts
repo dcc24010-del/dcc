@@ -67,7 +67,7 @@ export function setupAuth(app: Express) {
           // Check for Teacher ID if still not found
           if (!user) {
             const allUsers = await storage.getUsers();
-            user = allUsers.find((u: any) => u.teacherId === username) ?? null;
+            user = allUsers.find((u: any) => u.teacherId === username) ?? undefined;
           }
 
           if (!user) {
