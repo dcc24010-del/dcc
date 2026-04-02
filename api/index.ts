@@ -1,9 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
-import path from "path";
-import fs from "fs";
-// Static import so @vercel/node bundles server/routes and its entire
-// dependency tree (including db.ts) into the serverless function.
 import { registerRoutes } from "../server/routes";
 
 const app = express();
@@ -18,7 +14,9 @@ app.use((req, _res, next) => {
   const reqPath = req.path;
   _res.on("finish", () => {
     if (reqPath.startsWith("/api")) {
-      console.log(`${req.method} ${reqPath} ${_res.statusCode} in ${Date.now() - start}ms`);
+      console.log(
+        `${req.method} ${reqPath} ${_res.statusCode} in ${Date.now() - start}ms`
+      );
     }
   });
   next();
@@ -35,21 +33,6 @@ const initPromise = (async () => {
   }
 
   await registerRoutes(httpServer, app);
-
-  const distPath = path.join(process.cwd(), "dist", "public");
-  if (fs.existsSync(distPath)) {
-    app.use(express.static(distPath));
-    app.use("/{*path}", (_req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  } else {
-    app.use("/{*path}", (_req: Request, res: Response) => {
-      res.status(200).json({
-        status: "API running",
-        note: "Frontend assets not found. Ensure npm run build ran and dist/public is included.",
-      });
-    });
-  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (res.headersSent) return;
