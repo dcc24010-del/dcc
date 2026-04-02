@@ -2,6 +2,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
+// Static import so @vercel/node bundles server/routes and its entire
+// dependency tree (including db.ts) into the serverless function.
+import { registerRoutes } from "../server/routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -26,13 +29,11 @@ let initError: Error | null = null;
 const initPromise = (async () => {
   if (!process.env.DATABASE_URL) {
     throw new Error(
-      "DATABASE_URL is not configured. Go to Vercel → Project Settings → Environment Variables and add DATABASE_URL with your Supabase connection string."
+      "DATABASE_URL is not configured. Go to Vercel → Project Settings → " +
+        "Environment Variables and add DATABASE_URL with your Supabase connection string."
     );
   }
 
-  // Dynamic import keeps db.ts from throwing at module-load time when
-  // DATABASE_URL is missing, ensuring the handler can return a clean 500.
-  const { registerRoutes } = await import("../server/routes");
   await registerRoutes(httpServer, app);
 
   const distPath = path.join(process.cwd(), "dist", "public");
