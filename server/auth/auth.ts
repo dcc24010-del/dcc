@@ -17,11 +17,18 @@ declare global {
 export function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
 
+  const store = new PgStore({
+    pool,
+    createTableIfMissing: true,
+  });
+
+  // Prevent session store errors from crashing the serverless function
+  store.on("error", (err: Error) => {
+    console.error("[Session Store] Error:", err.message);
+  });
+
   const sessionSettings: session.SessionOptions = {
-    store: new PgStore({
-      pool,
-      createTableIfMissing: true,
-    }),
+    store,
     secret: process.env.SESSION_SECRET || "tuition-track-secret",
     resave: false,
     saveUninitialized: false,
@@ -36,16 +43,22 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Ensure default admin exists
+  // Ensure default admin exists — wrapped in try/catch so a DB error on
+  // startup doesn't crash the serverless function via unhandled rejection.
   (async () => {
-    const admin = await storage.getUserByUsername("dynamic");
-    if (!admin) {
-      const hashedPassword = await bcrypt.hash("dcc2020", 10);
-      await storage.createUser({
-        username: "dynamic",
-        password: hashedPassword,
-        role: "admin"
-      });
+    try {
+      const admin = await storage.getUserByUsername("dynamic");
+      if (!admin) {
+        const hashedPassword = await bcrypt.hash("dcc2020", 10);
+        await storage.createUser({
+          username: "dynamic",
+          password: hashedPassword,
+          role: "admin",
+        });
+        console.log("[Auth] Default admin created.");
+      }
+    } catch (err: any) {
+      console.error("[Auth] Could not seed default admin:", err.message);
     }
   })();
 
@@ -53,39 +66,43 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         let user = await storage.getUserByUsername(username);
-        
-        // If user not found by username, they might be a student trying to login with Student ID
-        // or a teacher trying to login with Teacher ID
+
         if (!user) {
-          // Check for Student ID
           const allStudents = await storage.getStudents();
-          const student = allStudents.find(s => s.studentCustomId === username);
+          const student = allStudents.find(
+            (s) => s.studentCustomId === username
+          );
           if (student && student.userId) {
             user = await storage.getUser(student.userId);
           }
 
-          // Check for Teacher ID if still not found
           if (!user) {
             const allUsers = await storage.getUsers();
-            user = allUsers.find((u: any) => u.teacherId === username) ?? undefined;
+            user =
+              allUsers.find((u: any) => u.teacherId === username) ?? undefined;
           }
 
           if (!user) {
-            return done(null, false, { message: "Invalid username or password" });
+            return done(null, false, {
+              message: "Invalid username or password",
+            });
           }
         }
 
-        // Check password
-        const isPasswordMatch = password === user.password || await bcrypt.compare(password, user.password);
-        
+        const isPasswordMatch =
+          password === user.password ||
+          (await bcrypt.compare(password, user.password));
+
         if (!isPasswordMatch) {
-          return done(null, false, { message: "Invalid username or password" });
+          return done(null, false, {
+            message: "Invalid username or password",
+          });
         }
         return done(null, user);
       } catch (err) {
         return done(err);
       }
-    }),
+    })
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
@@ -98,8 +115,34 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.json(req.user);
+  // Use passport callback form so ALL errors (including session store errors)
+  // are returned as JSON instead of plain text.
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate(
+      "local",
+      (err: any, user: SelectUser | false, info: { message: string }) => {
+        if (err) {
+          console.error("[Login] Auth error:", err.message);
+          return res
+            .status(500)
+            .json({ message: err.message || "Internal server error" });
+        }
+        if (!user) {
+          return res
+            .status(401)
+            .json({ message: info?.message || "Invalid credentials" });
+        }
+        req.login(user, (loginErr) => {
+          if (loginErr) {
+            console.error("[Login] Session error:", loginErr.message);
+            return res
+              .status(500)
+              .json({ message: loginErr.message || "Session error" });
+          }
+          res.json(user);
+        });
+      }
+    )(req, res, next);
   });
 
   app.post("/api/register", async (req, res) => {
@@ -113,7 +156,10 @@ export function setupAuth(app: Express) {
       password: hashedPassword,
     });
     req.login(user, (err) => {
-      if (err) return res.status(500).json({ message: "Login after registration failed" });
+      if (err)
+        return res
+          .status(500)
+          .json({ message: "Login after registration failed" });
       res.status(201).json(user);
     });
   });
