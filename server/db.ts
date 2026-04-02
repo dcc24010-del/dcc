@@ -14,21 +14,22 @@ if (!connectionString) {
 }
 
 // Singleton pool — reused across serverless invocations in the same container.
-// max: 3 keeps connection count low for serverless/Supabase pooler limits.
 let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
     _pool = new Pool({
       connectionString: connectionString ?? "",
-      ssl: connectionString ? { rejectUnauthorized: false } : false,
+      // Always enable SSL with rejectUnauthorized: false for Supabase compatibility.
+      // Supabase requires SSL; rejectUnauthorized: false accepts their certificate.
+      ssl: { rejectUnauthorized: false },
       max: 3,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
     });
 
     _pool.on("error", (err) => {
-      console.error("[DB] Idle pool client error:", err.message);
+      console.error("[DB] Pool error:", err.message);
     });
   }
   return _pool;
