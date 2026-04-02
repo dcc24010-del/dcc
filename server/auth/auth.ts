@@ -2,10 +2,9 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
-import { pool } from "../db";
 import { type User as SelectUser } from "@shared/schema";
 
 declare global {
@@ -14,21 +13,13 @@ declare global {
   }
 }
 
+const SessionStore = MemoryStore(session);
+
 export function setupAuth(app: Express) {
-  const PgStore = connectPgSimple(session);
-
-  const store = new PgStore({
-    pool,
-    createTableIfMissing: true,
-  });
-
-  // Prevent session store errors from crashing the serverless function
-  store.on("error", (err: Error) => {
-    console.error("[Session Store] Error:", err.message);
-  });
-
   const sessionSettings: session.SessionOptions = {
-    store,
+    store: new SessionStore({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    }),
     secret: process.env.SESSION_SECRET || "tuition-track-secret",
     resave: false,
     saveUninitialized: false,
@@ -43,8 +34,8 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Ensure default admin exists — wrapped in try/catch so a DB error on
-  // startup doesn't crash the serverless function via unhandled rejection.
+  // Seed default admin — wrapped in try/catch so a DB error on startup
+  // does not crash the serverless function via unhandled rejection.
   (async () => {
     try {
       const admin = await storage.getUserByUsername("dynamic");
@@ -115,8 +106,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Use passport callback form so ALL errors (including session store errors)
-  // are returned as JSON instead of plain text.
+  // Use passport callback form so ALL errors are returned as JSON.
   app.post("/api/login", (req, res, next) => {
     passport.authenticate(
       "local",
