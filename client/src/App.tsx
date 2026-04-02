@@ -14,9 +14,6 @@ import LoginPage from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { type User } from "@/lib/schemas";
 import { LayoutDashboard, Wallet, Receipt, Settings, UserPlus, FileCheck } from "lucide-react";
 
@@ -26,24 +23,6 @@ function Router() {
     retry: false
   });
   const [location] = useLocation();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      const socket = io();
-      socket.emit("join-admin");
-      socket.on("new-payment", (data) => {
-        toast({
-          title: "New Payment Received!",
-          description: `৳${data.amount} recorded for ${data.studentName} by ${data.teacherName}`,
-          duration: 10000,
-        });
-      });
-      return () => {
-        socket.disconnect();
-      };
-    }
-  }, [user, toast]);
 
   if (isLoading) return null;
 
