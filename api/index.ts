@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
-import { registerRoutes } from "../server/routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -31,6 +30,9 @@ const initPromise = (async () => {
     );
   }
 
+  // Dynamic import keeps db.ts from throwing at module-load time when
+  // DATABASE_URL is missing, ensuring the handler can return a clean 500.
+  const { registerRoutes } = await import("../server/routes");
   await registerRoutes(httpServer, app);
 
   const distPath = path.join(process.cwd(), "dist", "public");
