@@ -7,7 +7,6 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth } from "./auth/auth";
-import { Server as SocketServer } from "socket.io";
 import bcrypt from "bcryptjs";
 
 export async function registerRoutes(
@@ -15,16 +14,6 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   setupAuth(app);
-
-  const io = new SocketServer(httpServer, {
-    cors: { origin: "*" }
-  });
-
-  io.on("connection", (socket) => {
-    socket.on("join-admin", () => {
-      socket.join("admin");
-    });
-  });
   
   app.get(api.batches.list.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -200,15 +189,6 @@ export async function registerRoutes(
         ...input,
         recordedBy: (req.user as any).id,
         addedBy: (req.user as any).username
-      });
-      
-      // Notify Admin
-      const studentsList = await storage.getStudents();
-      const student = studentsList.find(s => s.id === income.studentId);
-      io.to("admin").emit("new-payment", {
-        studentName: student?.name,
-        amount: income.amount,
-        teacherName: (req.user as any).username
       });
 
       res.status(201).json(income);
