@@ -7,21 +7,32 @@ const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  // Log clearly but do NOT throw here — api/index.ts guards this before
-  // any DB code runs. Throwing at module-load time breaks @vercel/node
-  // static bundling (the function would crash on import, not in the handler).
   console.warn(
     "[DB] WARNING: DATABASE_URL is not set. " +
       "Add it in Vercel → Project Settings → Environment Variables."
   );
 }
 
-export const pool = new Pool({
-  connectionString: connectionString ?? "",
-  ssl: connectionString?.includes("supabase") ? { rejectUnauthorized: false } : false,
-  connectionTimeoutMillis: 8000,
-  idleTimeoutMillis: 30000,
-  max: 5,
-});
+// Singleton pool — reused across serverless invocations in the same container.
+// max: 3 keeps connection count low for serverless/Supabase pooler limits.
+let _pool: pg.Pool | null = null;
 
+function getPool(): pg.Pool {
+  if (!_pool) {
+    _pool = new Pool({
+      connectionString: connectionString ?? "",
+      ssl: connectionString ? { rejectUnauthorized: false } : false,
+      max: 3,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+    });
+
+    _pool.on("error", (err) => {
+      console.error("[DB] Idle pool client error:", err.message);
+    });
+  }
+  return _pool;
+}
+
+export const pool = getPool();
 export const db = drizzle(pool, { schema });
