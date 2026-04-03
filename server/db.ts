@@ -13,18 +13,15 @@ if (!connectionString) {
   );
 }
 
-// Singleton pool — reused across serverless invocations in the same container.
 let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
     _pool = new Pool({
       connectionString: connectionString ?? "",
-      // Always enable SSL with rejectUnauthorized: false for Supabase compatibility.
-      // Supabase requires SSL; rejectUnauthorized: false accepts their certificate.
       ssl: { rejectUnauthorized: false },
       max: 3,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
     });
 
