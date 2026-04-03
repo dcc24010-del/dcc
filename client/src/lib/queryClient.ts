@@ -6,8 +6,12 @@ async function throwIfResNotOk(res: Response) {
     try {
       const json = JSON.parse(text);
       if (json.message) throw new Error(json.message);
+      if (json.error) throw new Error(json.error);
     } catch (e) {
-      if (e instanceof Error && e.message !== text) throw e;
+      if (e instanceof SyntaxError) {
+        throw new Error(text || `Request failed with status ${res.status}`);
+      }
+      throw e;
     }
     throw new Error(text || `Request failed with status ${res.status}`);
   }
