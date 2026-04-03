@@ -22,6 +22,20 @@ app.use((req, _res, next) => {
   next();
 });
 
+app.get("/api/health", (_req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.json({
+    status: "ok",
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      HAS_DATABASE_URL: !!process.env.DATABASE_URL,
+      HAS_SESSION_SECRET: !!process.env.SESSION_SECRET,
+    },
+    initialized: !initError,
+    error: initError ? initError.message : null,
+  });
+});
+
 let initError: Error | null = null;
 
 const initPromise = (async () => {
@@ -39,6 +53,7 @@ const initPromise = (async () => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
     console.error("[Express error]", err);
+    res.setHeader("Content-Type", "application/json");
     res.status(status).json({ message });
   });
 })().catch((err: Error) => {
@@ -48,20 +63,23 @@ const initPromise = (async () => {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    res.setHeader("Content-Type", "application/json");
+
     await initPromise;
 
     if (initError) {
       return res.status(500).json({
-        error: "Server failed to initialize",
         message: initError.message,
       });
     }
 
-    app(req, res);
+    res.removeHeader("Content-Type");
+    app(req as any, res as any);
   } catch (err: any) {
     console.error("[Handler error]", err);
     if (!res.headersSent) {
-      res.status(500).json({ error: "Unexpected error", message: err?.message });
+      res.setHeader("Content-Type", "application/json");
+      res.status(500).json({ message: err?.message || "Unexpected server error" });
     }
   }
 }
