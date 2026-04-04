@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { students } from "@shared/schema";
+import { students } from "#shared/schema.js";
 import type { Express } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
-import { api } from "@shared/routes";
+import { api } from "#shared/routes.js";
 import { z } from "zod";
 import { setupAuth } from "./auth/auth";
 import bcrypt from "bcryptjs";
@@ -331,7 +331,7 @@ export async function registerRoutes(
     const role = (req.user as any).role;
     if (role !== "teacher" && role !== "admin") return res.sendStatus(403);
     try {
-      const { insertResultSchema } = await import("@shared/schema");
+      const { insertResultSchema } = await import("#shared/schema.js");
       const data = insertResultSchema.parse({
         ...req.body,
         totalMarks: Number(req.body.totalMarks),

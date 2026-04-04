@@ -5,7 +5,7 @@ import session from "express-session";
 import MemoryStore from "memorystore";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
-import { type User as SelectUser } from "@shared/schema";
+import { type User as SelectUser } from "#shared/schema.js";
 
 declare global {
   namespace Express {

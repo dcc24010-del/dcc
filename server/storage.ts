@@ -8,7 +8,7 @@ import {
   type User, type InsertUser,
   type Result, type InsertResult,
   type ModelTestDraft
-} from "@shared/schema";
+} from "#shared/schema.js";
 import { eq, desc, inArray } from "drizzle-orm";
 
 export interface IStorage {
