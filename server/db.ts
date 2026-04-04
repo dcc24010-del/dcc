@@ -17,19 +17,8 @@ let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
-    // Use libpq compatibility mode with sslmode=require to suppress the SSL warning
-    let connStr = connectionString ?? "";
-    if (connStr) {
-      // Remove any existing sslmode and uselibpqcompat params
-      connStr = connStr.replace(/[?&]sslmode=[^&]+/g, "").replace(/[?&]uselibpqcompat=[^&]+/g, "");
-      // Clean up any double && or trailing ?
-      connStr = connStr.replace(/\?&/, "?").replace(/&&/g, "&").replace(/[?&]$/, "");
-      // Add libpq compatibility mode
-      connStr += connStr.includes("?") ? "&uselibpqcompat=true&sslmode=require" : "?uselibpqcompat=true&sslmode=require";
-    }
-    
     _pool = new Pool({
-      connectionString: connStr,
+      connectionString: connectionString ?? "",
       max: 3,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
