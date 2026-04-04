@@ -17,15 +17,15 @@ let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
-    // Replace any existing sslmode with verify-full to avoid security warning
+    // Use libpq compatibility mode with sslmode=require to suppress the SSL warning
     let connStr = connectionString ?? "";
     if (connStr) {
-      // Replace existing sslmode parameter or append if not present
-      if (connStr.includes("sslmode=")) {
-        connStr = connStr.replace(/sslmode=[^&]+/, "sslmode=verify-full");
-      } else {
-        connStr += connStr.includes("?") ? "&sslmode=verify-full" : "?sslmode=verify-full";
-      }
+      // Remove any existing sslmode and uselibpqcompat params
+      connStr = connStr.replace(/[?&]sslmode=[^&]+/g, "").replace(/[?&]uselibpqcompat=[^&]+/g, "");
+      // Clean up any double && or trailing ?
+      connStr = connStr.replace(/\?&/, "?").replace(/&&/g, "&").replace(/[?&]$/, "");
+      // Add libpq compatibility mode
+      connStr += connStr.includes("?") ? "&uselibpqcompat=true&sslmode=require" : "?uselibpqcompat=true&sslmode=require";
     }
     
     _pool = new Pool({
