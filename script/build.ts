@@ -46,18 +46,29 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
-  await esbuild({
-    entryPoints: ["server/index.ts"],
-    platform: "node",
+  const serverBuildBase = {
+    platform: "node" as const,
     bundle: true,
-    format: "cjs",
-    outfile: "dist/index.cjs",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
+    format: "cjs" as const,
+    define: { "process.env.NODE_ENV": '"production"' },
     minify: true,
     external: externals,
-    logLevel: "info",
+    logLevel: "info" as const,
+  };
+
+  // Replit production server (calls httpServer.listen)
+  await esbuild({
+    ...serverBuildBase,
+    entryPoints: ["server/index.ts"],
+    outfile: "dist/index.cjs",
+  });
+
+  // Vercel serverless handler (exports Express app, no listen)
+  console.log("building vercel handler...");
+  await esbuild({
+    ...serverBuildBase,
+    entryPoints: ["server/handler.ts"],
+    outfile: "dist/handler.cjs",
   });
 }
 
