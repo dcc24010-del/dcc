@@ -2,9 +2,10 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { type Express } from "express";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { storage } from "../storage";
+import { pool } from "../db";
 import { type User as SelectUser } from "@shared/schema";
 
 declare global {
@@ -13,23 +14,24 @@ declare global {
   }
 }
 
-const SessionStore = MemoryStore(session);
-
-function jsonError(res: any, status: number, message: string) {
-  res.setHeader("Content-Type", "application/json");
-  res.status(status).json({ message });
-}
-
 export function setupAuth(app: Express) {
+  // Trust Vercel's reverse proxy so secure cookies work correctly
+  app.set("trust proxy", 1);
+
+  const PgStore = connectPgSimple(session);
+
   const sessionSettings: session.SessionOptions = {
-    store: new SessionStore({
-      checkPeriod: 86400000,
+    store: new PgStore({
+      pool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || "tuition-track-secret",
+    secret: process.env.SESSION_SECRET || "dcc-secret-key-2024",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7,
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
@@ -39,6 +41,7 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Ensure default admin exists — wrapped in try/catch so a DB error never crashes the server
   (async () => {
     try {
       const admin = await storage.getUserByUsername("dynamic");
@@ -49,10 +52,10 @@ export function setupAuth(app: Express) {
           password: hashedPassword,
           role: "admin",
         });
-        console.log("[Auth] Default admin created.");
+        console.log("[Auth] Default admin created");
       }
-    } catch (err: any) {
-      console.error("[Auth] Could not seed default admin:", err.message);
+    } catch (err) {
+      console.error("[Auth] Could not ensure default admin:", err);
     }
   })();
 
@@ -62,35 +65,30 @@ export function setupAuth(app: Express) {
         let user = await storage.getUserByUsername(username);
 
         if (!user) {
+          // Try Student ID
           const allStudents = await storage.getStudents();
-          const student = allStudents.find(
-            (s) => s.studentCustomId === username
-          );
+          const student = allStudents.find((s: any) => s.studentCustomId === username);
           if (student && student.userId) {
             user = await storage.getUser(student.userId);
           }
 
+          // Try Teacher ID
           if (!user) {
             const allUsers = await storage.getUsers();
-            user =
-              allUsers.find((u: any) => u.teacherId === username) ?? undefined;
+            user = allUsers.find((u: any) => u.teacherId === username);
           }
 
           if (!user) {
-            return done(null, false, {
-              message: "Invalid username or password",
-            });
+            return done(null, false, { message: "Invalid username or password" });
           }
         }
 
-        const isPasswordMatch =
+        const isMatch =
           password === user.password ||
           (await bcrypt.compare(password, user.password));
 
-        if (!isPasswordMatch) {
-          return done(null, false, {
-            message: "Invalid username or password",
-          });
+        if (!isMatch) {
+          return done(null, false, { message: "Invalid username or password" });
         }
         return done(null, user);
       } catch (err) {
@@ -100,33 +98,40 @@ export function setupAuth(app: Express) {
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
+
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user || undefined);
+      done(null, user ?? null);
     } catch (err) {
       done(err);
     }
   });
 
+  // Login — use callback form so errors return JSON instead of crashing
   app.post("/api/login", (req, res, next) => {
     passport.authenticate(
       "local",
-      (err: any, user: SelectUser | false, info: { message: string }) => {
+      (err: any, user: Express.User | false, info: { message: string } | undefined) => {
         if (err) {
-          console.error("[Login] Auth error:", err.message);
-          return jsonError(res, 500, err.message || "Internal server error");
+          console.error("[Auth] Login error:", err);
+          return res
+            .status(500)
+            .json({ message: "A server error occurred. Please try again." });
         }
         if (!user) {
-          return jsonError(res, 401, info?.message || "Invalid credentials");
+          return res
+            .status(401)
+            .json({ message: info?.message ?? "Invalid username or password" });
         }
         req.login(user, (loginErr) => {
           if (loginErr) {
-            console.error("[Login] Session error:", loginErr.message);
-            return jsonError(res, 500, loginErr.message || "Session error");
+            console.error("[Auth] Session save error:", loginErr);
+            return res
+              .status(500)
+              .json({ message: "Login succeeded but session could not be saved." });
           }
-          res.setHeader("Content-Type", "application/json");
-          res.json(user);
+          return res.json(user);
         });
       }
     )(req, res, next);
@@ -136,27 +141,22 @@ export function setupAuth(app: Express) {
     try {
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
-        return jsonError(res, 400, "Username already exists");
+        return res.status(400).json({ message: "Username already exists" });
       }
       const hashedPassword = await bcrypt.hash(req.body.password, 10);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-      });
+      const user = await storage.createUser({ ...req.body, password: hashedPassword });
       req.login(user, (err) => {
-        if (err) return jsonError(res, 500, "Login after registration failed");
-        res.setHeader("Content-Type", "application/json");
+        if (err) return res.status(500).json({ message: "Login after registration failed" });
         res.status(201).json(user);
       });
     } catch (err: any) {
-      console.error("[Register] Error:", err.message);
-      return jsonError(res, 500, err.message || "Registration failed");
+      res.status(500).json({ message: err.message ?? "Registration failed" });
     }
   });
 
   app.post("/api/logout", (req, res) => {
     req.logout((err) => {
-      if (err) return jsonError(res, 500, "Logout failed");
+      if (err) return res.status(500).json({ message: "Logout failed" });
       res.sendStatus(200);
     });
   });
