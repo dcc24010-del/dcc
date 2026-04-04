@@ -4,12 +4,15 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-const connectionString = process.env.DATABASE_URL;
+// Prefer NEON_DATABASE_URL (shared across Replit + Vercel) over the
+// runtime-managed Replit DATABASE_URL so both deployments hit the same DB.
+const connectionString =
+  process.env.NEON_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.warn(
-    "[DB] WARNING: DATABASE_URL is not set. " +
-      "Add it in Vercel → Project Settings → Environment Variables."
+    "[DB] WARNING: No database URL found. " +
+      "Set NEON_DATABASE_URL in your environment variables."
   );
 }
 
