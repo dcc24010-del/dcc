@@ -17,15 +17,19 @@ let _pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool {
   if (!_pool) {
-    // Append sslmode=verify-full to connection string if not already present
+    // Replace any existing sslmode with verify-full to avoid security warning
     let connStr = connectionString ?? "";
-    if (connStr && !connStr.includes("sslmode=")) {
-      connStr += connStr.includes("?") ? "&sslmode=verify-full" : "?sslmode=verify-full";
+    if (connStr) {
+      // Replace existing sslmode parameter or append if not present
+      if (connStr.includes("sslmode=")) {
+        connStr = connStr.replace(/sslmode=[^&]+/, "sslmode=verify-full");
+      } else {
+        connStr += connStr.includes("?") ? "&sslmode=verify-full" : "?sslmode=verify-full";
+      }
     }
     
     _pool = new Pool({
       connectionString: connStr,
-      ssl: true,
       max: 3,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
