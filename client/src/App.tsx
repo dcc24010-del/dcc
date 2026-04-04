@@ -18,15 +18,21 @@ import { type User } from "@/lib/schemas";
 import { LayoutDashboard, Wallet, Receipt, Settings, UserPlus, FileCheck } from "lucide-react";
 
 function Router() {
-  const { data: user, isLoading } = useQuery<User>({ 
+  const { data: user, isLoading, isError } = useQuery<User | null>({ 
     queryKey: ["/api/user"],
-    retry: false
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch("/api/user", { credentials: "include" });
+      if (res.status === 401) return null;
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    }
   });
   const [location] = useLocation();
 
   if (isLoading) return null;
 
-  if (!user) {
+  if (!user || isError) {
     return (
       <Switch>
         <Route path="/login" component={LoginPage} />

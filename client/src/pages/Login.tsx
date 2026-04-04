@@ -22,8 +22,11 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log("[v0] Attempting login with:", { username: data.username, role: data.role });
       const res = await apiRequest("POST", "/api/login", data);
-      return res.json();
+      const user = await res.json();
+      console.log("[v0] Login successful:", user);
+      return user;
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/user"], user);
@@ -31,6 +34,7 @@ export default function LoginPage() {
       toast({ title: "Logged in successfully" });
     },
     onError: (error: Error) => {
+      console.log("[v0] Login failed:", error.message);
       toast({ variant: "destructive", title: "Login failed", description: error.message });
     }
   });
