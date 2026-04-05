@@ -583,7 +583,7 @@ export default function EntryMarks() {
                         >
                           <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50 [&[data-state=open]]:bg-slate-50">
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-slate-800 text-base">Class {getBatchName(Number(batchId))}</span>
+                              <span className="font-bold text-slate-800 text-base">{getBatchName(Number(batchId))}</span>
                               <Badge variant="secondary" className="text-xs">{Object.keys(examGroups).length} exam{Object.keys(examGroups).length !== 1 ? "s" : ""}</Badge>
                             </div>
                           </AccordionTrigger>
