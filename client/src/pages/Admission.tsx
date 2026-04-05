@@ -245,7 +245,7 @@ export default function Admission() {
                     >
                       <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-slate-50 [&[data-state=open]]:bg-slate-50">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-700">Class {batchName}</span>
+                          <span className="font-semibold text-slate-700">{batchName}</span>
                           <Badge variant="secondary" className="text-xs">{batchStudents.length} student{batchStudents.length !== 1 ? "s" : ""}</Badge>
                         </div>
                       </AccordionTrigger>
