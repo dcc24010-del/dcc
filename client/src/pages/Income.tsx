@@ -329,7 +329,7 @@ export default function Income() {
                             >
                                 <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/30 [&[data-state=open]]:bg-muted/20">
                                     <div className="flex items-center gap-3">
-                                        <span className="font-bold text-base text-foreground">Class {batchName}</span>
+                                        <span className="font-bold text-base text-foreground">{batchName}</span>
                                         <Badge variant="secondary" className="text-xs font-semibold">
                                             {records.length} record{records.length !== 1 ? "s" : ""}
                                         </Badge>
