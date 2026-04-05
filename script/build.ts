@@ -63,12 +63,14 @@ async function buildAll() {
     outfile: "dist/index.cjs",
   });
 
-  // Vercel serverless handler (exports Express app, no listen)
+  // Vercel serverless handler — output to api/_server.cjs so it lives in the
+  // same directory as api/index.cjs (avoids cross-directory require issues).
+  // The underscore prefix tells Vercel NOT to treat it as an API endpoint.
   console.log("building vercel handler...");
   await esbuild({
     ...serverBuildBase,
     entryPoints: ["server/handler.ts"],
-    outfile: "dist/handler.cjs",
+    outfile: "api/_server.cjs",
   });
 }
 
