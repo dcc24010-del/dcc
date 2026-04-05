@@ -69,7 +69,7 @@ export default function Dashboard() {
     const historyIncomes = incomes || [];
     const studentProfile = (students as any[])?.find(s => s.userId === user?.id);
     const studentBatch = batches?.find(b => b.id === studentProfile?.batchId);
-    const batchLabel = studentBatch ? `Class ${studentBatch.name}` : null;
+    const batchLabel = studentBatch ? studentBatch.name : null;
 
     return (
       <Layout 
