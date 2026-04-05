@@ -5,6 +5,4 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .git.backup.*
-.local/
-.env
-.env.*
+api/_server.cjs
