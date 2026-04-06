@@ -2,6 +2,9 @@ import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
+// Vercel sets this env var automatically during its builds
+const isVercel = process.env.VERCEL === "1";
+
 // Packages to bundle into the Replit server build to reduce syscalls
 // and improve cold start times on the always-on Replit server.
 const replitAllowlist = [
@@ -27,15 +30,11 @@ async function buildAll() {
   console.log("building client...");
   await viteBuild();
 
-  console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
   const allDeps = [
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-
-  // Replit: bundle allowlisted deps for faster cold starts
-  const replitExternals = allDeps.filter((dep) => !replitAllowlist.includes(dep));
 
   const baseBuildConfig = {
     platform: "node" as const,
@@ -46,23 +45,36 @@ async function buildAll() {
     logLevel: "info" as const,
   };
 
-  // Replit production server (calls httpServer.listen)
-  await esbuild({
-    ...baseBuildConfig,
-    entryPoints: ["server/index.ts"],
-    outfile: "dist/index.cjs",
-    external: replitExternals,
-  });
+  if (isVercel) {
+    // Vercel build: only build the serverless handler — externalize ALL deps
+    // so Vercel's npm install handles them, keeping the bundle tiny.
+    console.log("building vercel handler...");
+    await esbuild({
+      ...baseBuildConfig,
+      entryPoints: ["server/handler.ts"],
+      outfile: "api/_server.cjs",
+      external: allDeps,
+    });
+  } else {
+    // Replit build: bundle allowlisted deps into a single file for faster cold starts
+    console.log("building replit server...");
+    const replitExternals = allDeps.filter((dep) => !replitAllowlist.includes(dep));
+    await esbuild({
+      ...baseBuildConfig,
+      entryPoints: ["server/index.ts"],
+      outfile: "dist/index.cjs",
+      external: replitExternals,
+    });
 
-  // Vercel serverless handler — externalize ALL deps so Vercel's npm install
-  // handles them, keeping the function bundle small and under size limits.
-  console.log("building vercel handler...");
-  await esbuild({
-    ...baseBuildConfig,
-    entryPoints: ["server/handler.ts"],
-    outfile: "api/_server.cjs",
-    external: allDeps,
-  });
+    // Also build the Vercel handler for local testing
+    console.log("building vercel handler...");
+    await esbuild({
+      ...baseBuildConfig,
+      entryPoints: ["server/handler.ts"],
+      outfile: "api/_server.cjs",
+      external: allDeps,
+    });
+  }
 }
 
 buildAll().catch((err) => {
