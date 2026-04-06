@@ -6,7 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("teacher"), // "admin", "teacher", or "student"
+  role: text("role").notNull().default("teacher"),
   teacherId: text("teacher_id").unique(),
   mobileNumber: text("mobile_number"),
 });
@@ -72,8 +72,17 @@ export const modelTestDrafts = pgTable("model_test_drafts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  message: text("message").notNull(),
+  type: text("type").notNull(), // "admission" | "payment" | "result"
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type ModelTestDraft = typeof modelTestDrafts.$inferSelect;
 export type InsertModelTestDraft = typeof modelTestDrafts.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true });

@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
-import { LayoutDashboard, Wallet, Receipt, Settings, LogOut, FileCheck, Home } from "lucide-react";
+import { LayoutDashboard, Wallet, Receipt, Settings, LogOut, FileCheck, Home, Bell } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -22,6 +22,13 @@ export function AppSidebar() {
     }
   });
 
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread-count"],
+    enabled: user?.role === "admin",
+    refetchInterval: 30000,
+  });
+  const unreadCount = unreadData?.count ?? 0;
+
   const menuItems = [
     { title: "Home", url: "/", icon: LayoutDashboard, roles: ["admin"] },
     { title: "Home", url: "/admission", icon: Home, roles: ["teacher"] },
@@ -29,6 +36,7 @@ export function AppSidebar() {
     { title: "Results", url: "/results", icon: FileCheck, roles: ["teacher", "student"] },
     { title: "Expenses", url: "/expenses", icon: Receipt, roles: ["admin"] },
     { title: "Manage", url: "/manage", icon: Settings, roles: ["admin"] },
+    { title: "Notifications", url: "/notifications", icon: Bell, roles: ["admin"] },
   ].filter(item => user && item.roles.includes(user.role));
 
   return (
@@ -49,6 +57,7 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1">
               {menuItems.map((item) => {
                 const isActive = location === item.url;
+                const showBadge = item.url === "/notifications" && unreadCount > 0;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive} size="lg" className={`
@@ -59,8 +68,20 @@ export function AppSidebar() {
                       }
                     `}>
                       <Link href={item.url} className="flex items-center gap-3 w-full h-full">
-                        <item.icon className={`w-5 h-5 ${isActive ? "text-white" : "text-primary"}`} />
-                        <span className="text-sm tracking-wide">{item.title}</span>
+                        <div className="relative">
+                          <item.icon className={`w-5 h-5 ${isActive ? "text-white" : "text-primary"}`} />
+                          {showBadge && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                              {unreadCount > 9 ? "9+" : unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm tracking-wide flex-1">{item.title}</span>
+                        {showBadge && (
+                          <span className="ml-auto bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                            {unreadCount}
+                          </span>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

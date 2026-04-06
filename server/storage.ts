@@ -1,13 +1,14 @@
 import { db } from "./db";
 import { 
-  incomes, expenses, batches, students, users, results, modelTestDrafts,
+  incomes, expenses, batches, students, users, results, modelTestDrafts, notifications,
   type Income, type InsertIncome, 
   type Expense, type InsertExpense,
   type Batch, type InsertBatch,
   type Student, type InsertStudent,
   type User, type InsertUser,
   type Result, type InsertResult,
-  type ModelTestDraft
+  type ModelTestDraft,
+  type Notification
 } from "@shared/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 
@@ -58,6 +59,12 @@ export interface IStorage {
   publishModelTestDraft(groupId: string): Promise<ModelTestDraft>;
   deleteModelTestDraft(groupId: string): Promise<void>;
   getPublishedModelTestGroupIds(): Promise<string[]>;
+
+  // Notifications
+  getNotifications(limit?: number): Promise<Notification[]>;
+  createNotification(message: string, type: string): Promise<Notification>;
+  markAllNotificationsRead(): Promise<void>;
+  getUnreadNotificationCount(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -353,6 +360,27 @@ export class DatabaseStorage implements IStorage {
       .from(modelTestDrafts)
       .where(eq(modelTestDrafts.status, "published"));
     return published.map(d => d.groupId);
+  }
+
+  async getNotifications(limit = 20): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async createNotification(message: string, type: string): Promise<Notification> {
+    const [notif] = await db.insert(notifications).values({ message, type }).returning();
+    return notif;
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await db.update(notifications).set({ isRead: true });
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const { count } = await import("drizzle-orm");
+    const [row] = await db.select({ count: count() }).from(notifications).where(eq(notifications.isRead, false));
+    return Number(row?.count ?? 0);
   }
 }
 

@@ -87,9 +87,18 @@ export async function registerRoutes(
           password: defaultPassword,
           role: "student"
         });
-        // Update student with user ID
         await storage.updateStudent(student.id, { userId: user.id });
       }
+
+      // Notification trigger: admission
+      try {
+        const batches = await storage.getBatches();
+        const batch = batches.find(b => b.id === student.batchId);
+        await storage.createNotification(
+          `New student ${student.name} admitted to ${batch?.name ?? "a batch"}.`,
+          "admission"
+        );
+      } catch (_) {}
       
       res.status(201).json(student);
     } catch (err) {
@@ -190,6 +199,16 @@ export async function registerRoutes(
         recordedBy: (req.user as any).id,
         addedBy: (req.user as any).username
       });
+
+      // Notification trigger: payment
+      try {
+        const studentsList = await storage.getStudents();
+        const student = studentsList.find((s: any) => s.id === input.studentId);
+        await storage.createNotification(
+          `Payment of ৳${input.amount} received from ${student?.name ?? "a student"} for ${input.month}.`,
+          "payment"
+        );
+      } catch (_) {}
 
       res.status(201).json(income);
     } catch (err) {
@@ -340,6 +359,18 @@ export async function registerRoutes(
         modelTestGroupId: req.body.modelTestGroupId || null,
       });
       const result = await storage.createResult(data);
+
+      // Notification trigger: result upload
+      try {
+        const allBatches = await storage.getBatches();
+        const batch = allBatches.find(b => b.id === data.batchId);
+        const teacherName = (req.user as any).username;
+        await storage.createNotification(
+          `${teacherName} has uploaded results for ${batch?.name ?? "a batch"} in ${data.subject}.`,
+          "result"
+        );
+      } catch (_) {}
+
       res.status(201).json(result);
     } catch (err) {
       res.status(400).json({ message: "Invalid data" });
@@ -452,11 +483,43 @@ export async function registerRoutes(
         return res.status(400).json({ message: "entries array is required" });
       }
       await storage.saveModelTestSubjectMarks(groupId, entries);
+
+      // Notification trigger: model test marks
+      try {
+        const allBatches = await storage.getBatches();
+        const batch = allBatches.find(b => b.id === entries[0].batchId);
+        const teacherName = (req.user as any).username;
+        const subject = entries[0].subject;
+        await storage.createNotification(
+          `${teacherName} has uploaded model test results for ${batch?.name ?? "a batch"} in ${subject}.`,
+          "result"
+        );
+      } catch (_) {}
+
       res.json({ saved: entries.length });
     } catch (err) {
       console.error("Error saving model test marks:", err);
       res.status(500).json({ message: "Failed to save marks" });
     }
+  });
+
+  // Notification API routes
+  app.get("/api/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== "admin") return res.sendStatus(403);
+    const notifs = await storage.getNotifications(20);
+    res.json(notifs);
+  });
+
+  app.get("/api/notifications/unread-count", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== "admin") return res.sendStatus(403);
+    const count = await storage.getUnreadNotificationCount();
+    res.json({ count });
+  });
+
+  app.patch("/api/notifications/read-all", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== "admin") return res.sendStatus(403);
+    await storage.markAllNotificationsRead();
+    res.json({ ok: true });
   });
 
   return httpServer;
