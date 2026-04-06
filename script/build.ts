@@ -2,32 +2,21 @@ import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times
-const allowlist = [
-  "@google/generative-ai",
-  "axios",
+// Packages to bundle into the Replit server build to reduce syscalls
+// and improve cold start times on the always-on Replit server.
+const replitAllowlist = [
   "connect-pg-simple",
-  "cors",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",
   "express",
-  "express-rate-limit",
   "express-session",
-  "jsonwebtoken",
   "memorystore",
-  "multer",
   "nanoid",
-  "nodemailer",
-  "openai",
   "passport",
   "passport-local",
   "pg",
-  "stripe",
-  "uuid",
   "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
 ];
@@ -44,33 +33,35 @@ async function buildAll() {
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
-  const serverBuildBase = {
+  // Replit: bundle allowlisted deps for faster cold starts
+  const replitExternals = allDeps.filter((dep) => !replitAllowlist.includes(dep));
+
+  const baseBuildConfig = {
     platform: "node" as const,
     bundle: true,
     format: "cjs" as const,
     define: { "process.env.NODE_ENV": '"production"' },
     minify: true,
-    external: externals,
     logLevel: "info" as const,
   };
 
   // Replit production server (calls httpServer.listen)
   await esbuild({
-    ...serverBuildBase,
+    ...baseBuildConfig,
     entryPoints: ["server/index.ts"],
     outfile: "dist/index.cjs",
+    external: replitExternals,
   });
 
-  // Vercel serverless handler — output to api/_server.cjs so it lives in the
-  // same directory as api/index.cjs (avoids cross-directory require issues).
-  // The underscore prefix tells Vercel NOT to treat it as an API endpoint.
+  // Vercel serverless handler — externalize ALL deps so Vercel's npm install
+  // handles them, keeping the function bundle small and under size limits.
   console.log("building vercel handler...");
   await esbuild({
-    ...serverBuildBase,
+    ...baseBuildConfig,
     entryPoints: ["server/handler.ts"],
     outfile: "api/_server.cjs",
+    external: allDeps,
   });
 }
 
