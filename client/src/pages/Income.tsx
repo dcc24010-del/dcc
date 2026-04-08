@@ -305,7 +305,7 @@ export default function Income() {
                 </div>
             </div>
 
-            {/* Class-wise grouped accordion */}
+            {/* Class → Month double-nested accordion */}
             {isLoading ? (
                 <div className="bg-card rounded-2xl border border-border shadow-sm p-12 text-center text-muted-foreground">
                     Loading...
@@ -315,7 +315,7 @@ export default function Income() {
                     No records found.
                 </div>
             ) : (() => {
-                // Group by batchId, preserving insertion order
+                // Group by batchId
                 const groups: Record<number, { batchName: string; records: IncomeWithRelations[] }> = {};
                 filteredIncomes.forEach((inc: any) => {
                     const bId = inc.batchId as number;
@@ -323,120 +323,159 @@ export default function Income() {
                     groups[bId].records.push(inc);
                 });
                 const groupEntries = Object.entries(groups);
-                const defaultOpen = groupEntries.map(([id]) => id);
                 return (
-                    <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-3">
-                        {groupEntries.map(([batchId, { batchName, records }]) => (
-                            <AccordionItem
-                                key={batchId}
-                                value={batchId}
-                                className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
-                            >
-                                <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/30 [&[data-state=open]]:bg-muted/20">
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-bold text-base text-foreground">{batchName}</span>
-                                        <Badge variant="secondary" className="text-xs font-semibold">
-                                            {records.length} record{records.length !== 1 ? "s" : ""}
-                                        </Badge>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="p-0">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
-                                                <TableHead>Student Name</TableHead>
-                                                <TableHead>Batch</TableHead>
-                                                <TableHead>Month</TableHead>
-                                                {isAdmin && <TableHead>Added By</TableHead>}
-                                                <TableHead>Date</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
-                                                <TableHead className="w-[90px]"></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {records.map((inc: any) => (
-                                                <TableRow
-                                                    key={inc.id}
-                                                    className={`group transition-colors ${
-                                                        inc.status === 'Pending'
-                                                            ? 'bg-amber-500/5 hover:bg-amber-500/10'
-                                                            : inc.status === 'Verified'
-                                                            ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
-                                                            : 'hover:bg-muted/30'
-                                                    }`}
-                                                >
-                                                    <TableCell className="font-medium">
-                                                        <div className="flex items-center gap-2">
-                                                            {inc.student?.name}
-                                                            {inc.status === 'Pending' && (
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Pending</span>
-                                                            )}
-                                                            {inc.status === 'Verified' && (
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                                                    <CheckCircle className="w-2.5 h-2.5" />
-                                                                    Verified
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                                                            {inc.batch?.name}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell>{inc.month}</TableCell>
-                                                    {isAdmin && <TableCell>{inc.addedBy || "N/A"}</TableCell>}
-                                                    <TableCell className="text-muted-foreground text-sm">{format(new Date(inc.date), "MMM d, y")}</TableCell>
-                                                    <TableCell className="text-right font-medium text-emerald-600">
-                                                        <div className="flex items-center justify-end gap-3">
-                                                            +৳{inc.amount.toLocaleString()}
-                                                            {isAdmin && inc.status === 'Pending' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="h-7 text-[10px] bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 hover:text-white"
-                                                                    onClick={() => verifyMutation.mutate(inc.id)}
-                                                                    disabled={verifyMutation.isPending}
-                                                                >
-                                                                    {verifyMutation.isPending ? "..." : "Verify"}
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100">
-                                                            {isAdmin && inc.student?.mobileNumber && (() => {
-                                                                const url = buildPaymentWhatsAppUrl(
-                                                                    inc.student.mobileNumber,
-                                                                    inc.amount,
-                                                                    inc.student.name,
-                                                                    inc.month
-                                                                );
-                                                                return url ? (
-                                                                    <a href={url} target="_blank" rel="noopener noreferrer">
-                                                                        <Button variant="ghost" size="icon" className="text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
-                                                                            <MessageCircle className="w-4 h-4" />
-                                                                        </Button>
-                                                                    </a>
-                                                                ) : null;
-                                                            })()}
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="text-destructive"
-                                                                onClick={() => handleDelete(inc.id)}
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
+                    <Accordion type="multiple" defaultValue={[]} className="space-y-3">
+                        {groupEntries.map(([batchId, { batchName, records }]) => {
+                            // Group records within this batch by month, sorted by calendar order
+                            const monthGroups: Record<string, IncomeWithRelations[]> = {};
+                            records.forEach((inc: any) => {
+                                const m = inc.month as string;
+                                if (!monthGroups[m]) monthGroups[m] = [];
+                                monthGroups[m].push(inc);
+                            });
+                            const sortedMonths = MONTHS.filter(m => monthGroups[m]);
+                            return (
+                                <AccordionItem
+                                    key={batchId}
+                                    value={batchId}
+                                    className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden"
+                                >
+                                    <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/30 [&[data-state=open]]:bg-muted/20">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-base text-foreground">{batchName}</span>
+                                            <Badge variant="secondary" className="text-xs font-semibold">
+                                                {records.length} record{records.length !== 1 ? "s" : ""}
+                                            </Badge>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-0">
+                                        {/* Month-level inner accordion */}
+                                        <Accordion type="multiple" defaultValue={[]} className="px-4 py-3 space-y-2">
+                                            {sortedMonths.map((monthName) => {
+                                                const monthRecords = monthGroups[monthName];
+                                                const monthKey = `${batchId}-${monthName}`;
+                                                const pendingCount = monthRecords.filter((r: any) => r.status === 'Pending').length;
+                                                const verifiedCount = monthRecords.filter((r: any) => r.status === 'Verified').length;
+                                                return (
+                                                    <AccordionItem
+                                                        key={monthKey}
+                                                        value={monthKey}
+                                                        className="border border-border/60 rounded-xl overflow-hidden bg-background"
+                                                    >
+                                                        <AccordionTrigger className="px-4 py-2.5 hover:no-underline hover:bg-primary/5 [&[data-state=open]]:bg-primary/5">
+                                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                                <span className="font-semibold text-sm text-primary">{monthName}</span>
+                                                                <Badge variant="outline" className="text-xs border-primary/30 text-primary/70 font-medium">
+                                                                    {monthRecords.length} student{monthRecords.length !== 1 ? "s" : ""}
+                                                                </Badge>
+                                                                {pendingCount > 0 && (
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                                                        {pendingCount} pending
+                                                                    </span>
+                                                                )}
+                                                                {verifiedCount > 0 && (
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                                        <CheckCircle className="w-2.5 h-2.5" />
+                                                                        {verifiedCount} verified
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </AccordionTrigger>
+                                                        <AccordionContent className="p-0">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow className="hover:bg-transparent">
+                                                                        <TableHead>Student Name</TableHead>
+                                                                        {isAdmin && <TableHead>Added By</TableHead>}
+                                                                        <TableHead>Date</TableHead>
+                                                                        <TableHead className="text-right">Amount</TableHead>
+                                                                        <TableHead className="w-[90px]"></TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {monthRecords.map((inc: any) => (
+                                                                        <TableRow
+                                                                            key={inc.id}
+                                                                            className={`group transition-colors ${
+                                                                                inc.status === 'Pending'
+                                                                                    ? 'bg-amber-500/5 hover:bg-amber-500/10'
+                                                                                    : inc.status === 'Verified'
+                                                                                    ? 'bg-emerald-500/5 hover:bg-emerald-500/10'
+                                                                                    : 'hover:bg-muted/30'
+                                                                            }`}
+                                                                        >
+                                                                            <TableCell className="font-medium">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {inc.student?.name}
+                                                                                    {inc.status === 'Pending' && (
+                                                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Pending</span>
+                                                                                    )}
+                                                                                    {inc.status === 'Verified' && (
+                                                                                        <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                                                            <CheckCircle className="w-2.5 h-2.5" />
+                                                                                            Verified
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </TableCell>
+                                                                            {isAdmin && <TableCell className="text-muted-foreground text-sm">{inc.addedBy || "N/A"}</TableCell>}
+                                                                            <TableCell className="text-muted-foreground text-sm">{format(new Date(inc.date), "MMM d, y")}</TableCell>
+                                                                            <TableCell className="text-right font-medium text-emerald-600">
+                                                                                <div className="flex items-center justify-end gap-3">
+                                                                                    +৳{inc.amount.toLocaleString()}
+                                                                                    {isAdmin && inc.status === 'Pending' && (
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline"
+                                                                                            className="h-7 text-[10px] bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700 hover:text-white"
+                                                                                            onClick={() => verifyMutation.mutate(inc.id)}
+                                                                                            disabled={verifyMutation.isPending}
+                                                                                        >
+                                                                                            {verifyMutation.isPending ? "..." : "Verify"}
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </div>
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100">
+                                                                                    {isAdmin && inc.student?.mobileNumber && (() => {
+                                                                                        const url = buildPaymentWhatsAppUrl(
+                                                                                            inc.student.mobileNumber,
+                                                                                            inc.amount,
+                                                                                            inc.student.name,
+                                                                                            inc.month
+                                                                                        );
+                                                                                        return url ? (
+                                                                                            <a href={url} target="_blank" rel="noopener noreferrer">
+                                                                                                <Button variant="ghost" size="icon" className="text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
+                                                                                                    <MessageCircle className="w-4 h-4" />
+                                                                                                </Button>
+                                                                                            </a>
+                                                                                        ) : null;
+                                                                                    })()}
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="text-destructive"
+                                                                                        onClick={() => handleDelete(inc.id)}
+                                                                                    >
+                                                                                        <Trash2 className="w-4 h-4" />
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                );
+                                            })}
+                                        </Accordion>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            );
+                        })}
                     </Accordion>
                 );
             })()}
