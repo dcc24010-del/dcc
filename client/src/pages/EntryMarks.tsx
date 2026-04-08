@@ -87,8 +87,14 @@ export default function EntryMarks() {
     enabled: !!user,
   });
 
-  const batchStudents = students?.filter((s) => s.batchId === Number(selectedBatchId)) || [];
-  const modelBatchStudents = students?.filter((s) => s.batchId === Number(modelBatchId)) || [];
+  const sortByStudentId = (a: any, b: any) => {
+    if (!a.studentCustomId && !b.studentCustomId) return 0;
+    if (!a.studentCustomId) return 1;
+    if (!b.studentCustomId) return -1;
+    return a.studentCustomId.localeCompare(b.studentCustomId, undefined, { numeric: true });
+  };
+  const batchStudents = (students?.filter((s) => s.batchId === Number(selectedBatchId)) || []).sort(sortByStudentId);
+  const modelBatchStudents = (students?.filter((s) => s.batchId === Number(modelBatchId)) || []).sort(sortByStudentId);
   const availableShifts = Array.from(new Set(batchStudents.map((s) => s.shift).filter(Boolean))) as string[];
   const availableGroups = Array.from(new Set(batchStudents.map((s) => s.academicGroup).filter(Boolean))) as string[];
 

@@ -10,7 +10,7 @@ import {
   type ModelTestDraft,
   type Notification
 } from "@shared/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -98,7 +98,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudents(): Promise<any[]> {
-    const allStudents = await db.select().from(students);
+    const allStudents = await db.select().from(students).orderBy(asc(students.studentCustomId));
     const allBatches = await db.select().from(batches);
     const allUsers = await db.select().from(users);
     console.log(`[STORAGE LOG] Students in DB: ${allStudents.length}`);

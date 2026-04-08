@@ -60,7 +60,12 @@ export default function Income() {
   });
 
   const selectedBatchId = form.watch("batchId");
-  const filteredStudents = (students as any[])?.filter(s => s.batchId === Number(selectedBatchId)) || [];
+  const filteredStudents = ((students as any[])?.filter(s => s.batchId === Number(selectedBatchId)) || []).sort((a: any, b: any) => {
+    if (!a.studentCustomId && !b.studentCustomId) return 0;
+    if (!a.studentCustomId) return 1;
+    if (!b.studentCustomId) return -1;
+    return a.studentCustomId.localeCompare(b.studentCustomId, undefined, { numeric: true });
+  });
 
   const verifyMutation = useMutation({
     mutationFn: async (id: number) => {

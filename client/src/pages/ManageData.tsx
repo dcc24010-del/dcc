@@ -214,7 +214,12 @@ export default function ManageData() {
                 <CardContent>
                   <Accordion type="multiple" className="w-full">
                     {batches?.map((batch) => {
-                      const batchStudents = students?.filter(s => s.batchId === batch.id) || [];
+                      const batchStudents = (students?.filter(s => s.batchId === batch.id) || []).sort((a, b) => {
+                        if (!a.studentCustomId && !b.studentCustomId) return 0;
+                        if (!a.studentCustomId) return 1;
+                        if (!b.studentCustomId) return -1;
+                        return a.studentCustomId.localeCompare(b.studentCustomId, undefined, { numeric: true });
+                      });
                       return (
                         <AccordionItem value={`batch-${batch.id}`} key={batch.id} className="border-b-0 mb-4">
                           <AccordionTrigger className="hover:no-underline py-2 px-4 bg-muted/50 rounded-lg group">

@@ -55,12 +55,19 @@ export default function Admission() {
     });
   }
 
+  const sortByStudentId = (a: any, b: any) => {
+    if (!a.studentCustomId && !b.studentCustomId) return 0;
+    if (!a.studentCustomId) return 1;
+    if (!b.studentCustomId) return -1;
+    return a.studentCustomId.localeCompare(b.studentCustomId, undefined, { numeric: true });
+  };
+
   // Build admission list data
   const myStudents = isTeacher
-    ? (students as any[] | undefined)?.filter((s: any) => s.addedByUserId === (user as any)?.id) ?? []
+    ? ((students as any[] | undefined)?.filter((s: any) => s.addedByUserId === (user as any)?.id) ?? []).sort(sortByStudentId)
     : [];
 
-  const allStudents = isAdmin ? (students as any[] | undefined) ?? [] : [];
+  const allStudents = isAdmin ? [...((students as any[] | undefined) ?? [])].sort(sortByStudentId) : [];
 
   // Group teacher's own students by batch
   const myStudentsByBatch: Record<string, any[]> = {};
