@@ -37,3 +37,26 @@ function getPool(): pg.Pool {
 
 export const pool = getPool();
 export const db = drizzle(pool, { schema });
+
+// Ensure all required tables exist in the production database.
+// This is a safety net for Vercel cold starts where the Neon DB may be
+// missing tables that were added after the initial schema push.
+export async function ensureSchema(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id        SERIAL PRIMARY KEY,
+        message   TEXT NOT NULL,
+        type      TEXT NOT NULL,
+        is_read   BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log("[DB] ensureSchema: notifications table ready.");
+  } catch (err: any) {
+    console.error("[DB] ensureSchema failed:", err.message);
+  } finally {
+    client.release();
+  }
+}

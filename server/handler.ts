@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
+import { ensureSchema } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,7 +22,7 @@ app.use((req, res, next) => {
 });
 
 // Register all routes (auth + API) — returns a Promise
-const ready = registerRoutes(httpServer, app).then(() => {
+const ready = ensureSchema().then(() => registerRoutes(httpServer, app)).then(() => {
   // Global error handler
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

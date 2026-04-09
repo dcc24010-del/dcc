@@ -98,7 +98,9 @@ export async function registerRoutes(
           `New student ${student.name} admitted to ${batch?.name ?? "a batch"}.`,
           "admission"
         );
-      } catch (_) {}
+      } catch (notifErr: any) {
+        console.error("[Notification] admission trigger failed:", notifErr.message);
+      }
       
       res.status(201).json(student);
     } catch (err) {
@@ -208,7 +210,9 @@ export async function registerRoutes(
           `Payment of ৳${input.amount} received from ${student?.name ?? "a student"} for ${input.month}.`,
           "payment"
         );
-      } catch (_) {}
+      } catch (notifErr: any) {
+        console.error("[Notification] payment trigger failed:", notifErr.message);
+      }
 
       res.status(201).json(income);
     } catch (err) {
@@ -369,7 +373,9 @@ export async function registerRoutes(
           `${teacherName} has uploaded results for ${batch?.name ?? "a batch"} in ${data.subject}.`,
           "result"
         );
-      } catch (_) {}
+      } catch (notifErr: any) {
+        console.error("[Notification] result upload trigger failed:", notifErr.message);
+      }
 
       res.status(201).json(result);
     } catch (err) {
@@ -494,7 +500,9 @@ export async function registerRoutes(
           `${teacherName} has uploaded model test results for ${batch?.name ?? "a batch"} in ${subject}.`,
           "result"
         );
-      } catch (_) {}
+      } catch (notifErr: any) {
+        console.error("[Notification] model test trigger failed:", notifErr.message);
+      }
 
       res.json({ saved: entries.length });
     } catch (err) {
