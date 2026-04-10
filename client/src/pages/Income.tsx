@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Search, Filter, Calendar as CalendarIcon, CheckCircle, History as HistoryIcon, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Search, Filter, Calendar as CalendarIcon, CheckCircle, History as HistoryIcon, MessageCircle, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { buildPaymentWhatsAppUrl } from "@/lib/whatsapp";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -119,6 +121,95 @@ export default function Income() {
             }
         });
     }
+  }
+
+  function downloadMonthPdf(batchName: string, monthName: string, records: IncomeWithRelations[]) {
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Title
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 80);
+    doc.text("Dynamic Coaching Center", pageWidth / 2, 18, { align: "center" });
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 120);
+    doc.text("Monthly Payment Statement", pageWidth / 2, 25, { align: "center" });
+
+    // Subtitle: Class + Month
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Class: ${batchName}   |   Month: ${monthName}`, pageWidth / 2, 33, { align: "center" });
+
+    // Horizontal rule
+    doc.setDrawColor(180, 180, 220);
+    doc.setLineWidth(0.4);
+    doc.line(14, 37, pageWidth - 14, 37);
+
+    // Sort records by studentCustomId ascending
+    const sorted = [...records].sort((a, b) => {
+      const idA = (a.student as any)?.studentCustomId ?? "";
+      const idB = (b.student as any)?.studentCustomId ?? "";
+      return idA.localeCompare(idB, undefined, { numeric: true });
+    });
+
+    const totalCollection = sorted.reduce((sum, r) => sum + Number(r.amount), 0);
+
+    // Table
+    autoTable(doc, {
+      startY: 41,
+      head: [["Student Name", "Student ID", "Amount (Tk)", "Payment Date", "Added By"]],
+      body: sorted.map((inc) => [
+        (inc.student as any)?.name ?? "—",
+        (inc.student as any)?.studentCustomId ?? "—",
+        `Tk ${Number(inc.amount).toLocaleString()}`,
+        inc.date ? format(new Date(inc.date), "MMM d, yyyy") : "—",
+        inc.addedBy ?? "—",
+      ]),
+      foot: [["", "", `Total: Tk ${totalCollection.toLocaleString()}`, "", ""]],
+      headStyles: {
+        fillColor: [63, 63, 160],
+        textColor: 255,
+        fontStyle: "bold",
+        fontSize: 9,
+        halign: "left",
+      },
+      footStyles: {
+        fillColor: [230, 230, 245],
+        textColor: [40, 40, 80],
+        fontStyle: "bold",
+        fontSize: 9,
+      },
+      bodyStyles: { fontSize: 9, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [248, 248, 255] },
+      columnStyles: {
+        0: { cellWidth: 48 },
+        1: { cellWidth: 26, halign: "center" },
+        2: { cellWidth: 30, halign: "right" },
+        3: { cellWidth: 32, halign: "center" },
+        4: { cellWidth: 46 },
+      },
+      margin: { left: 14, right: 14 },
+      tableLineColor: [200, 200, 220],
+      tableLineWidth: 0.2,
+    });
+
+    // Footer note
+    const finalY = (doc as any).lastAutoTable.finalY + 6;
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Generated on ${format(new Date(), "PPpp")} — Dynamic Coaching Center`,
+      pageWidth / 2,
+      finalY,
+      { align: "center" }
+    );
+
+    doc.save(`DCC_Payment_${batchName}_${monthName}.pdf`);
   }
 
   const filteredIncomes = (incomes as IncomeWithRelations[])?.filter(inc => 
@@ -382,6 +473,21 @@ export default function Income() {
                                                             </div>
                                                         </AccordionTrigger>
                                                         <AccordionContent className="p-0">
+                                                            <div className="flex items-center justify-between px-4 py-2 bg-muted/10 border-b border-border/40">
+                                                                <span className="text-xs font-semibold text-muted-foreground">
+                                                                    Total Collection: <span className="text-emerald-600">৳{monthRecords.reduce((sum, r: any) => sum + Number(r.amount), 0).toLocaleString()}</span>
+                                                                </span>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 text-xs gap-1.5 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                                                    onClick={() => downloadMonthPdf(batchName, monthName, monthRecords)}
+                                                                    data-testid={`button-download-pdf-${batchId}-${monthName}`}
+                                                                >
+                                                                    <FileDown className="w-3.5 h-3.5" />
+                                                                    Download PDF
+                                                                </Button>
+                                                            </div>
                                                             <Table>
                                                                 <TableHeader>
                                                                     <TableRow className="hover:bg-transparent">
