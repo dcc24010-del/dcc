@@ -162,6 +162,12 @@ export default function Income() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
 
+  const isTeacherRole = user?.role === "teacher";
+  const { data: myCollection, refetch: refetchMyCollection } = useQuery<{ amount: number; lastUpdated: string | null }>({
+    queryKey: ["/api/collections/me"],
+    enabled: isTeacherRole,
+  });
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -213,6 +219,7 @@ export default function Income() {
           title: "Payment added",
           description: "Payment recorded successfully",
         });
+        queryClient.invalidateQueries({ queryKey: ["/api/collections/me"] });
       },
       onError: (error: any) => {
         toast({
@@ -464,6 +471,28 @@ export default function Income() {
         }
     >
         <div className="space-y-4">
+            {/* Teacher: My Current Collection box */}
+            {isTeacherRole && (
+                <div className="bg-gradient-to-r from-indigo-600 to-blue-500 rounded-2xl p-5 flex items-center justify-between shadow-lg text-white">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-100 mb-0.5">My Current Collection</p>
+                        <p className="text-3xl font-bold tracking-tight" data-testid="text-my-collection">
+                            ৳{(myCollection?.amount ?? 0).toLocaleString()}
+                        </p>
+                        {myCollection?.lastUpdated && (
+                            <p className="text-[11px] text-indigo-200 mt-1">
+                                Last updated: {format(new Date(myCollection.lastUpdated), "MMM d, h:mm a")}
+                            </p>
+                        )}
+                    </div>
+                    <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.171-.879-1.171-2.303 0-3.182.53-.398 1.21-.597 1.925-.596m.353 5.435V17m0-10.435V7" />
+                        </svg>
+                    </div>
+                </div>
+            )}
+
             {/* Search bar */}
             <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
                 <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">

@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { 
-  incomes, expenses, batches, students, users, results, modelTestDrafts, notifications,
+  incomes, expenses, batches, students, users, results, modelTestDrafts, notifications, collectionTracking,
   type Income, type InsertIncome, 
   type Expense, type InsertExpense,
   type Batch, type InsertBatch,
@@ -8,7 +8,8 @@ import {
   type User, type InsertUser,
   type Result, type InsertResult,
   type ModelTestDraft,
-  type Notification
+  type Notification,
+  type CollectionTracking
 } from "@shared/schema";
 import { eq, desc, inArray, asc } from "drizzle-orm";
 
@@ -65,6 +66,12 @@ export interface IStorage {
   createNotification(message: string, type: string): Promise<Notification>;
   markAllNotificationsRead(): Promise<void>;
   getUnreadNotificationCount(): Promise<number>;
+
+  // Collection Tracking
+  getTeacherCollection(teacherId: number): Promise<CollectionTracking | undefined>;
+  addToTeacherCollection(teacherId: number, amount: number): Promise<void>;
+  resetTeacherCollection(teacherId: number): Promise<void>;
+  getAllTeacherCollections(): Promise<{ teacher: User; amount: number; lastUpdated: Date }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -381,6 +388,48 @@ export class DatabaseStorage implements IStorage {
     const { count } = await import("drizzle-orm");
     const [row] = await db.select({ count: count() }).from(notifications).where(eq(notifications.isRead, false));
     return Number(row?.count ?? 0);
+  }
+
+  async getTeacherCollection(teacherId: number): Promise<CollectionTracking | undefined> {
+    const [row] = await db.select().from(collectionTracking).where(eq(collectionTracking.teacherId, teacherId));
+    return row;
+  }
+
+  async addToTeacherCollection(teacherId: number, amount: number): Promise<void> {
+    const { sql } = await import("drizzle-orm");
+    await db.insert(collectionTracking)
+      .values({ teacherId, amount, lastUpdated: new Date() })
+      .onConflictDoUpdate({
+        target: collectionTracking.teacherId,
+        set: {
+          amount: sql`${collectionTracking.amount} + ${amount}`,
+          lastUpdated: new Date(),
+        },
+      });
+  }
+
+  async resetTeacherCollection(teacherId: number): Promise<void> {
+    const existing = await this.getTeacherCollection(teacherId);
+    if (existing) {
+      await db.update(collectionTracking)
+        .set({ amount: 0, lastUpdated: new Date() })
+        .where(eq(collectionTracking.teacherId, teacherId));
+    } else {
+      await db.insert(collectionTracking).values({ teacherId, amount: 0, lastUpdated: new Date() });
+    }
+  }
+
+  async getAllTeacherCollections(): Promise<{ teacher: User; amount: number; lastUpdated: Date }[]> {
+    const teachers = await db.select().from(users).where(eq(users.role, "teacher"));
+    const collections = await db.select().from(collectionTracking);
+    return teachers.map(teacher => {
+      const col = collections.find(c => c.teacherId === teacher.id);
+      return {
+        teacher,
+        amount: col?.amount ?? 0,
+        lastUpdated: col?.lastUpdated ?? new Date(0),
+      };
+    });
   }
 }
 

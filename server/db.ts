@@ -52,8 +52,14 @@ export async function ensureSchema(): Promise<void> {
         is_read   BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS collection_tracking (
+        id          SERIAL PRIMARY KEY,
+        teacher_id  INTEGER NOT NULL UNIQUE REFERENCES users(id),
+        amount      INTEGER NOT NULL DEFAULT 0,
+        last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
-    console.log("[DB] ensureSchema: notifications table ready.");
+    console.log("[DB] ensureSchema: notifications + collection_tracking tables ready.");
   } catch (err: any) {
     console.error("[DB] ensureSchema failed:", err.message);
   } finally {

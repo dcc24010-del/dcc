@@ -1,10 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bell, UserPlus, Wallet, FileCheck, CheckCheck } from "lucide-react";
+import { Bell, UserPlus, Wallet, FileCheck, CheckCheck, RefreshCw, RotateCcw, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import type { Notification } from "@shared/schema";
 import { Layout } from "@/components/Layout";
+import { useToast } from "@/hooks/use-toast";
 
 const TYPE_CONFIG = {
   admission: {
@@ -36,9 +37,24 @@ const TYPE_CONFIG = {
   },
 };
 
+type TeacherCollection = {
+  teacher: { id: number; username: string; teacherId?: string | null };
+  amount: number;
+  lastUpdated: string;
+};
+
 export default function Notifications() {
+  const { toast } = useToast();
+
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
+  });
+
+  const { data: user } = useQuery<any>({ queryKey: ["/api/user"] });
+
+  const { data: collections = [], isLoading: collectionsLoading, refetch: refetchCollections } = useQuery<TeacherCollection[]>({
+    queryKey: ["/api/collections"],
+    enabled: user?.role === "admin",
   });
 
   const markAllRead = useMutation({
@@ -49,21 +65,55 @@ export default function Notifications() {
     },
   });
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const resetMutation = useMutation({
+    mutationFn: (teacherId: number) => apiRequest("POST", `/api/collections/${teacherId}/reset`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/collections"] });
+      toast({ title: "Collection Reset", description: "The teacher's balance has been cleared." });
+    },
+    onError: () => {
+      toast({ title: "Reset Failed", variant: "destructive" });
+    },
+  });
 
-  const action = unreadCount > 0 ? (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => markAllRead.mutate()}
-      disabled={markAllRead.isPending}
-      className="flex items-center gap-2 rounded-xl text-xs font-bold"
-      data-testid="button-mark-all-read"
-    >
-      <CheckCheck className="w-4 h-4" />
-      Mark all as read
-    </Button>
-  ) : undefined;
+  function handleReset(teacherId: number, teacherName: string) {
+    if (confirm(`Reset collection balance for ${teacherName} to ৳0? This confirms cash has been received.`)) {
+      resetMutation.mutate(teacherId);
+    }
+  }
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const isAdmin = user?.role === "admin";
+
+  const action = (
+    <div className="flex items-center gap-2">
+      {isAdmin && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => refetchCollections()}
+          className="flex items-center gap-2 rounded-xl text-xs font-bold"
+          data-testid="button-refresh-collections"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Refresh
+        </Button>
+      )}
+      {unreadCount > 0 && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => markAllRead.mutate()}
+          disabled={markAllRead.isPending}
+          className="flex items-center gap-2 rounded-xl text-xs font-bold"
+          data-testid="button-mark-all-read"
+        >
+          <CheckCheck className="w-4 h-4" />
+          Mark all as read
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <Layout
@@ -71,60 +121,132 @@ export default function Notifications() {
       subtitle={unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
       action={action}
     >
-      <div className="max-w-2xl mx-auto space-y-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
-            ))}
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <Bell className="w-8 h-8 text-muted-foreground" />
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Authority Only: Daily Collection Summary */}
+        {isAdmin && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Banknote className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Daily Collection Summary</h2>
             </div>
-            <p className="text-muted-foreground font-medium">No notifications yet</p>
-            <p className="text-xs text-muted-foreground max-w-xs">
-              Activity such as admissions, payments, and results will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {notifications.map((notif) => {
-              const config = TYPE_CONFIG[notif.type as keyof typeof TYPE_CONFIG] ?? TYPE_CONFIG.result;
-              const Icon = config.icon;
-              return (
-                <div
-                  key={notif.id}
-                  data-testid={`notification-item-${notif.id}`}
-                  className={`flex items-start gap-4 p-4 rounded-2xl border transition-all ${config.bg} ${
-                    !notif.isRead ? "ring-1 ring-inset ring-current/10 shadow-sm" : "opacity-75"
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${config.iconBg}`}>
-                    <Icon className={`w-5 h-5 ${config.iconColor}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-foreground leading-snug">{notif.message}</p>
-                      {!notif.isRead && (
-                        <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${config.dot}`} />
+            {collectionsLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
+                ))}
+              </div>
+            ) : collections.length === 0 ? (
+              <div className="bg-muted/30 rounded-2xl border border-border p-6 text-center text-sm text-muted-foreground">
+                No teachers found. Add teachers to track collections.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {collections.map(({ teacher, amount, lastUpdated }) => (
+                  <div
+                    key={teacher.id}
+                    data-testid={`card-collection-${teacher.id}`}
+                    className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                          {teacher.teacherId ?? "Teacher"}
+                        </p>
+                        <p className="font-bold text-foreground text-sm leading-tight">{teacher.username}</p>
+                      </div>
+                      <div className={`px-2.5 py-1 rounded-xl text-sm font-bold ${amount > 0 ? "bg-indigo-50 text-indigo-700" : "bg-muted text-muted-foreground"}`}>
+                        ৳{amount.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      {lastUpdated && amount > 0 ? (
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">No collections yet</span>
                       )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${config.badge}`}>
-                        {config.label}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
-                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={amount === 0 || resetMutation.isPending}
+                        onClick={() => handleReset(teacher.id, teacher.username)}
+                        data-testid={`button-reset-collection-${teacher.id}`}
+                        className="h-7 text-[11px] gap-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 disabled:opacity-40"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Reset
+                      </Button>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            )}
           </div>
         )}
+
+        {/* Notifications List */}
+        <div>
+          {isAdmin && (
+            <div className="flex items-center gap-2 mb-3">
+              <Bell className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Activity Feed</h2>
+            </div>
+          )}
+          {isLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <Bell className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium">No notifications yet</p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Activity such as admissions, payments, and results will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notif) => {
+                const config = TYPE_CONFIG[notif.type as keyof typeof TYPE_CONFIG] ?? TYPE_CONFIG.result;
+                const Icon = config.icon;
+                return (
+                  <div
+                    key={notif.id}
+                    data-testid={`notification-item-${notif.id}`}
+                    className={`flex items-start gap-4 p-4 rounded-2xl border transition-all ${config.bg} ${
+                      !notif.isRead ? "ring-1 ring-inset ring-current/10 shadow-sm" : "opacity-75"
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${config.iconBg}`}>
+                      <Icon className={`w-5 h-5 ${config.iconColor}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground leading-snug">{notif.message}</p>
+                        {!notif.isRead && (
+                          <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${config.dot}`} />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${config.badge}`}>
+                          {config.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );

@@ -214,6 +214,17 @@ export async function registerRoutes(
         console.error("[Notification] payment trigger failed:", notifErr.message);
       }
 
+      // Collection tracking: add amount to the recording teacher's running balance
+      try {
+        const recorderId = (req.user as any).id;
+        const recorderRole = (req.user as any).role;
+        if (recorderRole === "teacher") {
+          await storage.addToTeacherCollection(recorderId, input.amount);
+        }
+      } catch (colErr: any) {
+        console.error("[Collection] update failed:", colErr.message);
+      }
+
       res.status(201).json(income);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -265,6 +276,28 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || (req.user as any).role !== 'admin') return res.sendStatus(403);
     await storage.deleteExpense(Number(req.params.id));
     res.sendStatus(204);
+  });
+
+  // Collection Tracking Routes
+  app.get("/api/collections", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'admin') return res.sendStatus(403);
+    const collections = await storage.getAllTeacherCollections();
+    res.json(collections);
+  });
+
+  app.get("/api/collections/me", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
+    if (user.role !== 'teacher') return res.sendStatus(403);
+    const col = await storage.getTeacherCollection(user.id);
+    res.json({ amount: col?.amount ?? 0, lastUpdated: col?.lastUpdated ?? null });
+  });
+
+  app.post("/api/collections/:teacherId/reset", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'admin') return res.sendStatus(403);
+    const teacherId = Number(req.params.teacherId);
+    await storage.resetTeacherCollection(teacherId);
+    res.json({ success: true });
   });
 
   // Teacher Management Routes
