@@ -163,7 +163,7 @@ export default function LoginPage() {
         </button>
       </div>
 
-      <div className="w-full max-w-xl relative z-10 px-6 space-y-8 py-10 pb-16">
+      <div className="w-full max-w-xl relative z-10 px-6 space-y-8 py-10 pb-28">
         {/* Branding Section */}
         <div className="text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-1000">
           <div className="inline-flex relative group">
@@ -408,7 +408,7 @@ export default function LoginPage() {
       </Dialog>
 
       {/* Footer Branding */}
-      <div className="relative z-10 w-full text-center pb-8 animate-in fade-in duration-1000 delay-700">
+      <div className="relative z-10 w-full text-center pb-24 animate-in fade-in duration-1000 delay-700">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">
           Powered by DCC © 2026
         </p>
