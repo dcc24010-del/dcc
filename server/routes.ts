@@ -301,6 +301,17 @@ export async function registerRoutes(
   });
 
   // Teacher Management Routes
+  app.get("/api/teachers/directory", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const teachers = await storage.getTeachers();
+    const directory = teachers.map(t => ({
+      id: t.id,
+      name: t.username,
+      mobileNumber: t.mobileNumber ?? null,
+    }));
+    res.json(directory);
+  });
+
   app.get("/api/admin/teachers", async (req, res) => {
     if (!req.isAuthenticated() || (req.user as any).role !== 'admin') return res.sendStatus(403);
     const teachers = await storage.getTeachers();

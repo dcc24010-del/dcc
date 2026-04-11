@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { useIncomes, useExpenses, useBatches, useStudents } from "@/hooks/use-finance";
-import { Users, History, CheckCircle2, Clock, Wallet, TrendingUp, CreditCard, BarChart3, GraduationCap, BookOpen, UserCircle2 } from "lucide-react";
+import { Users, History, CheckCircle2, Clock, Wallet, TrendingUp, CreditCard, BarChart3, GraduationCap, BookOpen, UserCircle2, Phone, BookUser } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +33,11 @@ export default function Dashboard() {
   
   const { data: results, isLoading: loadingResults } = useQuery<any[]>({
     queryKey: ["/api/results"],
+    enabled: !!user && user.role === "student"
+  });
+
+  const { data: teacherDirectory, isLoading: loadingDirectory } = useQuery<{ id: number; name: string; mobileNumber: string | null }[]>({
+    queryKey: ["/api/teachers/directory"],
     enabled: !!user && user.role === "student"
   });
 
@@ -119,6 +124,77 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Teacher Directory ── */}
+          <Card className="border-none bg-white shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)] rounded-2xl overflow-hidden">
+            <CardHeader className="bg-white border-b border-[#F1F5F9] py-5 px-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-500 border border-indigo-100">
+                  <BookUser className="w-5 h-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg text-[#1E293B] font-extrabold tracking-tight">Teacher Directory</CardTitle>
+                  <p className="text-xs font-medium text-[#64748B] mt-0.5">Tap a number to call directly</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              {loadingDirectory ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+                </div>
+              ) : teacherDirectory && teacherDirectory.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {teacherDirectory.map((teacher) => (
+                    <div
+                      key={teacher.id}
+                      data-testid={`card-teacher-${teacher.id}`}
+                      className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/40 transition-all duration-200"
+                    >
+                      {/* Avatar */}
+                      <div className="shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center shadow-sm">
+                        <span className="text-white text-sm font-black">
+                          {teacher.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate capitalize">{teacher.name}</p>
+                        {teacher.mobileNumber ? (
+                          <a
+                            href={`tel:${teacher.mobileNumber}`}
+                            data-testid={`link-call-teacher-${teacher.id}`}
+                            className="inline-flex items-center gap-1.5 mt-0.5 text-indigo-600 hover:text-indigo-800 transition-colors"
+                          >
+                            <Phone className="w-3 h-3 shrink-0" />
+                            <span className="text-xs font-semibold">{teacher.mobileNumber}</span>
+                          </a>
+                        ) : (
+                          <p className="text-xs text-slate-400 mt-0.5">No number on record</p>
+                        )}
+                      </div>
+                      {/* Call button */}
+                      {teacher.mobileNumber && (
+                        <a
+                          href={`tel:${teacher.mobileNumber}`}
+                          data-testid={`button-call-teacher-${teacher.id}`}
+                          className="shrink-0 p-2 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-600 transition-colors"
+                          aria-label={`Call ${teacher.name}`}
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                  <BookUser className="w-10 h-10 mb-2 opacity-30" />
+                  <p className="text-sm font-medium">No teachers found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
