@@ -8,12 +8,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Shield, Lock, User as UserIcon, GraduationCap, ChevronLeft, ArrowRight, Sparkles, Eye, EyeOff, Phone, KeyRound, CheckCircle2 } from "lucide-react";
+import { Shield, Lock, User as UserIcon, GraduationCap, ChevronLeft, ArrowRight, Sparkles, Eye, EyeOff, Phone, KeyRound, CheckCircle2, Download } from "lucide-react";
 import coachingLogo from "@assets/IMG_20260126_081644_1769393818079.jpg";
+import { usePWAInstall } from "@/hooks/use-pwa-install";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { handleInstall, isInstalled, canInstall } = usePWAInstall();
+
+  const handleInstallClick = async () => {
+    const result = await handleInstall();
+    if (result === "already_installed") {
+      toast({
+        title: "DCC App is already installed!",
+        description: "You're accessing DCC from your installed app.",
+      });
+    } else if (result === "unavailable") {
+      toast({
+        title: "DCC App is already installed on your device!",
+        description: "Open your home screen to find the DCC app.",
+      });
+    }
+  };
 
   const [role, setRole] = useState<"admin" | "teacher" | "student" | null>(null);
   const [isLogin, setIsLogin] = useState(true);
@@ -129,6 +146,23 @@ export default function LoginPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/5 blur-[120px] rounded-full animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/5 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+
+      {/* Install App Button — top-right, always visible */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          data-testid="button-install-app"
+          onClick={handleInstallClick}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-primary/20 shadow-md hover:shadow-lg hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 group min-h-[44px] min-w-[44px]"
+          aria-label="Install DCC App"
+        >
+          <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
+            <Download className="w-3.5 h-3.5 text-primary" />
+          </span>
+          <span className="hidden sm:block text-xs font-bold text-primary tracking-wide whitespace-nowrap">
+            {isInstalled ? "App Installed" : "Install App"}
+          </span>
+        </button>
       </div>
 
       <div className="w-full max-w-xl relative z-10 px-6 space-y-8 py-10 pb-16">
