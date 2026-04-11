@@ -63,23 +63,21 @@ function StudentCombobox({
   );
 
   useEffect(() => {
-    function handleOutside(e: MouseEvent | TouchEvent) {
+    function handleOutside(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setQuery("");
       }
     }
-    document.addEventListener("mousedown", handleOutside);
-    document.addEventListener("touchstart", handleOutside);
+    document.addEventListener("pointerdown", handleOutside);
     return () => {
-      document.removeEventListener("mousedown", handleOutside);
-      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("pointerdown", handleOutside);
     };
   }, []);
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => searchRef.current?.focus(), 60);
+      setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 60);
     }
   }, [open]);
 
@@ -107,7 +105,10 @@ function StudentCombobox({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
+        <div
+          className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <div className="p-2 border-b border-border/50">
             <input
               ref={searchRef}
@@ -119,7 +120,7 @@ function StudentCombobox({
               className="w-full h-8 px-2 text-xs rounded border border-input bg-background outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
-          <div className="max-h-[40vh] overflow-y-auto overscroll-contain">
+          <div className="max-h-[35vh] overflow-y-auto overscroll-contain">
             {filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No students found.
