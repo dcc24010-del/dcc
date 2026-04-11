@@ -275,7 +275,15 @@ export default function ManageData() {
                                             {student.mobileNumber && (
                                               <>
                                                 <span>•</span>
-                                                <span>Mob: {student.mobileNumber}</span>
+                                                <a
+                                                  href={`tel:${student.mobileNumber}`}
+                                                  className="flex items-center gap-1 text-blue-600 hover:text-blue-700 active:text-blue-800"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  data-testid={`link-call-${student.id}`}
+                                                >
+                                                  <Phone className="h-4 w-4 shrink-0" />
+                                                  <span>{student.mobileNumber}</span>
+                                                </a>
                                               </>
                                             )}
                                             {student.shift && (
