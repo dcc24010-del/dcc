@@ -143,15 +143,22 @@ export default function LoginPage() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/5 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Install App Button — top-right, always visible */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Install App — fixed floating bar at bottom center */}
+      <div className="fixed bottom-6 left-0 right-0 flex justify-center z-50 pointer-events-none">
         <button
           data-testid="button-install-app"
           onClick={handleInstallClick}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-200 min-h-[44px] whitespace-nowrap"
+          className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 rounded-2xl text-white text-xs font-semibold tracking-wide active:scale-95 transition-all duration-200"
+          style={{
+            background: "linear-gradient(135deg, rgba(26,152,210,0.92) 0%, rgba(79,102,222,0.92) 100%)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
+            boxShadow: "0 4px 24px rgba(26,152,210,0.28), 0 1.5px 6px rgba(0,0,0,0.10)",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
           aria-label="Install DCC App"
         >
-          <Download className="w-4 h-4 shrink-0" />
+          <Download className="w-3.5 h-3.5 shrink-0 opacity-90" />
           Install App
         </button>
       </div>
