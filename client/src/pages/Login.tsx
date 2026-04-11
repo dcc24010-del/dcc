@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Lock, User as UserIcon, GraduationCap, ChevronLeft, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Shield, Lock, User as UserIcon, GraduationCap, ChevronLeft, ArrowRight, Sparkles, Eye, EyeOff, Phone, KeyRound, CheckCircle2 } from "lucide-react";
 import coachingLogo from "@assets/IMG_20260126_081644_1769393818079.jpg";
 
 export default function LoginPage() {
@@ -19,6 +20,68 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Forgot password state
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [fpStep, setFpStep] = useState<"mobile" | "reset" | "done">("mobile");
+  const [fpMobile, setFpMobile] = useState("");
+  const [fpNewPassword, setFpNewPassword] = useState("");
+  const [fpConfirmPassword, setFpConfirmPassword] = useState("");
+  const [fpShowNew, setFpShowNew] = useState(false);
+  const [fpShowConfirm, setFpShowConfirm] = useState(false);
+
+  const verifyMobileMutation = useMutation({
+    mutationFn: async (mobileNumber: string) => {
+      const res = await apiRequest("POST", "/api/student/verify-mobile", { mobileNumber });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => setFpStep("reset"),
+    onError: (err: Error) => toast({ variant: "destructive", title: "Not found", description: err.message }),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ mobileNumber, newPassword }: { mobileNumber: string; newPassword: string }) => {
+      const res = await apiRequest("POST", "/api/student/reset-password", { mobileNumber, newPassword });
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => setFpStep("done"),
+    onError: (err: Error) => toast({ variant: "destructive", title: "Reset failed", description: err.message }),
+  });
+
+  const handleFpVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fpMobile.trim()) return;
+    verifyMobileMutation.mutate(fpMobile.trim());
+  };
+
+  const handleFpReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (fpNewPassword.length < 6) {
+      toast({ variant: "destructive", title: "Too short", description: "Password must be at least 6 characters." });
+      return;
+    }
+    if (fpNewPassword !== fpConfirmPassword) {
+      toast({ variant: "destructive", title: "Mismatch", description: "Passwords do not match." });
+      return;
+    }
+    resetPasswordMutation.mutate({ mobileNumber: fpMobile, newPassword: fpNewPassword });
+  };
+
+  const openForgot = () => {
+    setFpStep("mobile");
+    setFpMobile("");
+    setFpNewPassword("");
+    setFpConfirmPassword("");
+    setForgotOpen(true);
+  };
 
   const loginMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -181,6 +244,19 @@ export default function LoginPage() {
                     >
                       {loginMutation.isPending ? "AUTHENTICATING..." : "Login"}
                     </Button>
+
+                    {role === "student" && (
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={openForgot}
+                          data-testid="link-forgot-password"
+                          className="text-xs text-primary/70 hover:text-primary font-semibold underline underline-offset-2 transition-colors"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    )}
                   </form>
                 </CardContent>
               </Card>
@@ -188,6 +264,116 @@ export default function LoginPage() {
           </div>
         )}
       </div>
+
+      {/* Forgot Password Dialog */}
+      <Dialog open={forgotOpen} onOpenChange={(open) => { if (!open) setForgotOpen(false); }}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-primary" />
+              {fpStep === "done" ? "Password Reset" : "Forgot Password"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Step 1 — Mobile Verification */}
+          {fpStep === "mobile" && (
+            <form onSubmit={handleFpVerify} className="space-y-5 pt-1">
+              <p className="text-sm text-slate-500">Enter your registered mobile number to verify your identity.</p>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Mobile Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type="tel"
+                    placeholder="01xxxxxxxxx"
+                    className="pl-11 h-12 bg-slate-50 border-slate-200 rounded-2xl"
+                    value={fpMobile}
+                    onChange={(e) => setFpMobile(e.target.value)}
+                    required
+                    data-testid="input-fp-mobile"
+                  />
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-2xl font-bold"
+                disabled={verifyMobileMutation.isPending}
+                data-testid="button-fp-verify"
+              >
+                {verifyMobileMutation.isPending ? "Verifying..." : "Verify Number"}
+              </Button>
+            </form>
+          )}
+
+          {/* Step 2 — Set New Password */}
+          {fpStep === "reset" && (
+            <form onSubmit={handleFpReset} className="space-y-5 pt-1">
+              <p className="text-sm text-slate-500">Mobile verified. Set your new password below.</p>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type={fpShowNew ? "text" : "password"}
+                    placeholder="Min. 6 characters"
+                    className="pl-11 pr-11 h-12 bg-slate-50 border-slate-200 rounded-2xl"
+                    value={fpNewPassword}
+                    onChange={(e) => setFpNewPassword(e.target.value)}
+                    required
+                    data-testid="input-fp-new-password"
+                  />
+                  <button type="button" onClick={() => setFpShowNew(!fpShowNew)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary">
+                    {fpShowNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type={fpShowConfirm ? "text" : "password"}
+                    placeholder="Repeat password"
+                    className="pl-11 pr-11 h-12 bg-slate-50 border-slate-200 rounded-2xl"
+                    value={fpConfirmPassword}
+                    onChange={(e) => setFpConfirmPassword(e.target.value)}
+                    required
+                    data-testid="input-fp-confirm-password"
+                  />
+                  <button type="button" onClick={() => setFpShowConfirm(!fpShowConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary">
+                    {fpShowConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-2xl font-bold"
+                disabled={resetPasswordMutation.isPending}
+                data-testid="button-fp-reset"
+              >
+                {resetPasswordMutation.isPending ? "Updating..." : "Update Password"}
+              </Button>
+            </form>
+          )}
+
+          {/* Step 3 — Success */}
+          {fpStep === "done" && (
+            <div className="py-4 space-y-5 text-center">
+              <div className="flex justify-center">
+                <CheckCircle2 className="w-16 h-16 text-green-500" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700">Password updated successfully!<br />You can now log in.</p>
+              <Button
+                className="w-full h-12 rounded-2xl font-bold"
+                onClick={() => setForgotOpen(false)}
+                data-testid="button-fp-done"
+              >
+                Back to Login
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Footer Branding */}
       <div className="relative z-10 w-full text-center pb-8 animate-in fade-in duration-1000 delay-700">

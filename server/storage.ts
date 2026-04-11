@@ -36,6 +36,7 @@ export interface IStorage {
   getIncomes(): Promise<any[]>;
   getIncomesByStudentId(studentId: number): Promise<any[]>;
   getStudentByUserId(userId: number): Promise<Student | undefined>;
+  getStudentByMobile(mobileNumber: string): Promise<Student | undefined>;
   createIncome(income: InsertIncome & { recordedBy?: number }): Promise<Income>;
   updateIncomeStatus(id: number, status: string): Promise<Income>;
   deleteIncome(id: number): Promise<void>;
@@ -209,6 +210,11 @@ export class DatabaseStorage implements IStorage {
 
   async getStudentByUserId(userId: number): Promise<Student | undefined> {
     const [student] = await db.select().from(students).where(eq(students.userId, userId));
+    return student;
+  }
+
+  async getStudentByMobile(mobileNumber: string): Promise<Student | undefined> {
+    const [student] = await db.select().from(students).where(eq(students.mobileNumber, mobileNumber));
     return student;
   }
 

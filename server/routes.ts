@@ -364,6 +364,39 @@ export async function registerRoutes(
     }
   });
 
+  // Forgot Password — public endpoints (no auth required)
+  app.post("/api/student/verify-mobile", async (req, res) => {
+    try {
+      const { mobileNumber } = z.object({ mobileNumber: z.string().min(1) }).parse(req.body);
+      const student = await storage.getStudentByMobile(mobileNumber);
+      if (!student || !student.userId) {
+        return res.status(404).json({ message: "Mobile number not found in our records." });
+      }
+      res.json({ found: true });
+    } catch {
+      res.status(400).json({ message: "Invalid request." });
+    }
+  });
+
+  app.post("/api/student/reset-password", async (req, res) => {
+    try {
+      const { mobileNumber, newPassword } = z.object({
+        mobileNumber: z.string().min(1),
+        newPassword: z.string().min(6, "Password must be at least 6 characters"),
+      }).parse(req.body);
+      const student = await storage.getStudentByMobile(mobileNumber);
+      if (!student || !student.userId) {
+        return res.status(404).json({ message: "Mobile number not found in our records." });
+      }
+      const hashed = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(student.userId, { password: hashed });
+      res.json({ message: "Password updated successfully! You can now log in." });
+    } catch (err: any) {
+      if (err?.errors) return res.status(400).json({ message: err.errors[0]?.message ?? "Invalid request." });
+      res.status(400).json({ message: "Failed to reset password." });
+    }
+  });
+
   // Results Routes
   app.get("/api/results", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
