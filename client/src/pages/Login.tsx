@@ -192,7 +192,7 @@ export default function LoginPage() {
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => { setRole(item.id as any); setIsLogin(true); }}
+                onClick={() => { setRole(item.id as any); setIsLogin(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 className="group relative flex flex-col items-center text-center p-5 rounded-[1.5rem] bg-white border border-primary/5 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-500"
               >
                 <div className={`p-3 rounded-xl ${item.color} mb-4 group-hover:scale-110 transition-all duration-500`}>
@@ -216,7 +216,7 @@ export default function LoginPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setRole(null)}
+                    onClick={() => { setRole(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     className="mb-8 -ml-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 font-bold text-xs tracking-widest"
                   >
                     <ChevronLeft className="w-4 h-4 mr-2" /> BACK
