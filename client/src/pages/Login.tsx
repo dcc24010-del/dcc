@@ -15,19 +15,14 @@ import { usePWAInstall } from "@/hooks/use-pwa-install";
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { handleInstall, isInstalled, canInstall } = usePWAInstall();
+  const { handleInstall } = usePWAInstall();
 
   const handleInstallClick = async () => {
     const result = await handleInstall();
-    if (result === "already_installed") {
+    if (result === "already_installed" || result === "unavailable") {
       toast({
-        title: "DCC App is already installed!",
-        description: "You're accessing DCC from your installed app.",
-      });
-    } else if (result === "unavailable") {
-      toast({
-        title: "DCC App is already installed on your device!",
-        description: "Open your home screen to find the DCC app.",
+        title: "App is already installed!",
+        description: "Find the DCC app on your home screen.",
       });
     }
   };
@@ -153,15 +148,11 @@ export default function LoginPage() {
         <button
           data-testid="button-install-app"
           onClick={handleInstallClick}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-primary/20 shadow-md hover:shadow-lg hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 group min-h-[44px] min-w-[44px]"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30 active:scale-95 transition-all duration-200 min-h-[44px] whitespace-nowrap"
           aria-label="Install DCC App"
         >
-          <span className="flex items-center justify-center w-7 h-7 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
-            <Download className="w-3.5 h-3.5 text-primary" />
-          </span>
-          <span className="hidden sm:block text-xs font-bold text-primary tracking-wide whitespace-nowrap">
-            {isInstalled ? "App Installed" : "Install App"}
-          </span>
+          <Download className="w-4 h-4 shrink-0" />
+          Install App
         </button>
       </div>
 
