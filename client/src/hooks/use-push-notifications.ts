@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -10,15 +10,9 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function usePushNotifications(userId?: number) {
-  const queryClient = useQueryClient();
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const subscriptionRef = useRef<PushSubscription | null>(null);
-
-  useEffect(() => {
-    if (!("Notification" in window)) return;
-    setPermission(Notification.permission);
-  }, []);
 
   const subscribeMutation = useMutation({
     mutationFn: async () => {
@@ -26,15 +20,20 @@ export function usePushNotifications(userId?: number) {
         throw new Error("Push not supported");
       }
 
-      const { data: vapidData } = await fetch("/api/push/vapid-public-key").then(r => r.json()).then(d => ({ data: d }));
+      const vapidData = await fetch("/api/push/vapid-public-key").then(r => r.json());
       const vapidKey = vapidData?.key;
-      if (!vapidKey) throw new Error("No VAPID key");
+      if (!vapidKey) throw new Error("No VAPID key from server");
 
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey),
-      });
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+      }
+
       subscriptionRef.current = sub;
       const json = sub.toJSON();
       await apiRequest("POST", "/api/push/subscribe", {
@@ -46,14 +45,23 @@ export function usePushNotifications(userId?: number) {
     },
   });
 
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+    const perm = Notification.permission;
+    setPermission(perm);
+    if (perm === "granted" && userId) {
+      subscribeMutation.mutateAsync().catch(() => {});
+    }
+  }, [userId]);
+
   const requestPermissionAndSubscribe = async (): Promise<boolean> => {
     if (!("Notification" in window)) return false;
+    if (Notification.permission === "denied") return false;
     if (Notification.permission === "granted") {
       setPermission("granted");
       await subscribeMutation.mutateAsync();
       return true;
     }
-    if (Notification.permission === "denied") return false;
     const result = await Notification.requestPermission();
     setPermission(result);
     if (result === "granted") {
