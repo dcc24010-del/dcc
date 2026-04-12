@@ -117,7 +117,11 @@ function StudentCombobox({
               className="w-full h-8 px-2 text-xs rounded border border-input bg-background outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
-          <div className="max-h-[35vh] overflow-y-auto overscroll-contain">
+          <div
+            className="overflow-y-auto overscroll-contain"
+            style={{ maxHeight: "200px", touchAction: "pan-y" }}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
             {filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No students found.
@@ -363,7 +367,7 @@ export default function Income() {
                             <Plus className="w-4 h-4 mr-2" /> Add Payment
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="payment-dialog sm:max-w-[425px]">
                         <DialogHeader>
                             <DialogTitle>Add New Payment</DialogTitle>
                             <DialogDescription>

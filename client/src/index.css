@@ -87,6 +87,16 @@
   }
 }
 
+/* Payment modal: pin to top on mobile so keyboard doesn't cover it */
+@media (max-width: 639px) {
+  .payment-dialog {
+    top: 1rem !important;
+    transform: translateX(-50%) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow-y: auto;
+  }
+}
+
 /* Custom utility for glassmorphism and premium effects */
 @layer utilities {
   .glass-card {
