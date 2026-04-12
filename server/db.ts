@@ -58,8 +58,25 @@ export async function ensureSchema(): Promise<void> {
         amount      INTEGER NOT NULL DEFAULT 0,
         last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        endpoint   TEXT NOT NULL UNIQUE,
+        p256dh     TEXT NOT NULL,
+        auth       TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS student_notifications (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        message    TEXT NOT NULL,
+        type       TEXT NOT NULL,
+        url        TEXT NOT NULL DEFAULT '/',
+        is_read    BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
     `);
-    console.log("[DB] ensureSchema: notifications + collection_tracking tables ready.");
+    console.log("[DB] ensureSchema: all tables ready.");
   } catch (err: any) {
     console.error("[DB] ensureSchema failed:", err.message);
   } finally {

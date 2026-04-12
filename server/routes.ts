@@ -704,6 +704,29 @@ export async function registerRoutes(
     }
   });
 
+  // Test push — sends a real push to the currently logged-in user
+  app.post("/api/push/test", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).id;
+    const subs = await storage.getPushSubscriptionsByUserId(userId);
+    console.log(`[Push] Test push requested by userId=${userId}, subscriptions=${subs.length}`);
+
+    if (subs.length === 0) {
+      return res.status(400).json({
+        message: "No push subscription found for your account. Please click 'Allow' on the notification banner first.",
+      });
+    }
+
+    await sendPushToUser(userId, {
+      title: "✅ Test Notification",
+      body: "Push notifications are working correctly on this device!",
+      url: "/",
+      tag: "push-test",
+    });
+
+    res.json({ ok: true, subscriptions: subs.length });
+  });
+
   return httpServer;
 }
 

@@ -1,11 +1,12 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bell, UserPlus, Wallet, FileCheck, CheckCheck, RefreshCw, RotateCcw, Banknote } from "lucide-react";
+import { Bell, UserPlus, Wallet, FileCheck, CheckCheck, RefreshCw, RotateCcw, Banknote, BellRing, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import type { Notification } from "@shared/schema";
 import { Layout } from "@/components/Layout";
 import { useToast } from "@/hooks/use-toast";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 const TYPE_CONFIG = {
   admission: {
@@ -42,6 +43,82 @@ type TeacherCollection = {
   amount: number;
   lastUpdated: string;
 };
+
+function PushTestCard() {
+  const { toast } = useToast();
+  const { permission, requestPermissionAndSubscribe, isLoading: subLoading } = usePushNotifications();
+
+  const testMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/push/test"),
+    onSuccess: (data: any) => {
+      toast({ title: "✅ Test Sent!", description: `Push delivered to ${data.subscriptions} subscription(s). Check your phone/browser.` });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "Unknown error";
+      toast({ title: "Push Failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const { data: vapidData } = useQuery<{ key: string }>({ queryKey: ["/api/push/vapid-public-key"] });
+  const vapidConfigured = !!(vapidData?.key);
+  const swSupported = "serviceWorker" in navigator && "PushManager" in window;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-4">
+      <div className="flex items-center gap-2">
+        <BellRing className="w-4 h-4 text-primary" />
+        <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Push Notification Diagnostics</h2>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold ${vapidConfigured ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+          {vapidConfigured ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+          VAPID Keys: {vapidConfigured ? "Configured ✓" : "Missing ✗"}
+        </div>
+        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold ${swSupported ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+          {swSupported ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+          Service Worker: {swSupported ? "Supported ✓" : "Not Supported ✗"}
+        </div>
+        <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl font-semibold ${permission === "granted" ? "bg-green-50 text-green-700" : permission === "denied" ? "bg-red-50 text-red-600" : "bg-yellow-50 text-yellow-700"}`}>
+          <Bell className="w-3.5 h-3.5" />
+          Permission: {permission === "granted" ? "Granted ✓" : permission === "denied" ? "Denied ✗" : "Not Asked"}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {permission !== "granted" && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={subLoading}
+            onClick={requestPermissionAndSubscribe}
+            data-testid="button-enable-push-admin"
+            className="rounded-xl text-xs font-bold gap-1.5"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            {subLoading ? "Enabling…" : "Enable Push on This Device"}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          disabled={testMutation.isPending}
+          onClick={() => testMutation.mutate()}
+          data-testid="button-test-push"
+          className="rounded-xl text-xs font-bold gap-1.5"
+        >
+          <BellRing className="w-3.5 h-3.5" />
+          {testMutation.isPending ? "Sending…" : "Send Test Notification"}
+        </Button>
+      </div>
+
+      {!vapidConfigured && (
+        <div className="text-xs bg-red-50 text-red-700 rounded-xl px-3 py-2.5 border border-red-200">
+          <strong>⚠ Vercel Config Required:</strong> Add <code className="bg-red-100 px-1 rounded">VAPID_PUBLIC_KEY</code>, <code className="bg-red-100 px-1 rounded">VAPID_PRIVATE_KEY</code>, and <code className="bg-red-100 px-1 rounded">VAPID_EMAIL</code> to your Vercel Environment Variables. See the chat for the exact values.
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Notifications() {
   const { toast } = useToast();
@@ -122,6 +199,9 @@ export default function Notifications() {
       action={action}
     >
       <div className="max-w-2xl mx-auto space-y-6">
+        {/* Push Notification Diagnostics */}
+        {isAdmin && <PushTestCard />}
+
         {/* Authority Only: Daily Collection Summary */}
         {isAdmin && (
           <div>
