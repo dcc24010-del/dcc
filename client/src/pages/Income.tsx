@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import { useIncomes, useCreateIncome, useDeleteIncome, useBatches, useStudents } from "@/hooks/use-finance";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,6 @@ function StudentCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = students.find((s) => s.id.toString() === value);
@@ -62,27 +61,27 @@ function StudentCombobox({
       (s.studentCustomId ?? "").toLowerCase().includes(query.toLowerCase())
   );
 
-  useEffect(() => {
-    function handleOutside(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("pointerdown", handleOutside);
-    return () => {
-      document.removeEventListener("pointerdown", handleOutside);
-    };
-  }, []);
+  function closeDropdown() {
+    setOpen(false);
+    setQuery("");
+  }
 
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 60);
-    }
-  }, [open]);
+  function openDropdown() {
+    setOpen(true);
+    setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 50);
+  }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
+      {/* Transparent overlay — covers everything behind the dropdown; tap it to close */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40"
+          onPointerDown={closeDropdown}
+          aria-hidden="true"
+        />
+      )}
+
       <button
         type="button"
         disabled={disabled}
@@ -91,7 +90,8 @@ function StudentCombobox({
         onPointerDown={(e) => {
           if (disabled) return;
           e.preventDefault();
-          setOpen((prev) => !prev);
+          if (open) closeDropdown();
+          else openDropdown();
         }}
       >
         <span className={selected ? "text-foreground" : "text-muted-foreground"}>
@@ -105,10 +105,7 @@ function StudentCombobox({
       </button>
 
       {open && (
-        <div
-          className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg">
           <div className="p-2 border-b border-border/50">
             <input
               ref={searchRef}
@@ -136,8 +133,7 @@ function StudentCombobox({
                   onPointerDown={(e) => {
                     e.preventDefault();
                     onChange(student.id.toString());
-                    setOpen(false);
-                    setQuery("");
+                    closeDropdown();
                   }}
                 >
                   {student.name} ({student.studentCustomId})
