@@ -8,6 +8,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth } from "./auth/auth";
 import bcrypt from "bcryptjs";
+import { VAPID_PUBLIC_KEY, sendPushToUser, sendPushToBatch } from "./push";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -206,10 +207,20 @@ export async function registerRoutes(
       try {
         const studentsList = await storage.getStudents();
         const student = studentsList.find((s: any) => s.id === input.studentId);
-        await storage.createNotification(
-          `Payment of ৳${input.amount} received from ${student?.name ?? "a student"} for ${input.month}.`,
-          "payment"
-        );
+        const notifMsg = `Payment of ৳${input.amount} received from ${student?.name ?? "a student"} for ${input.month}.`;
+        await storage.createNotification(notifMsg, "payment");
+
+        // Send push + student notification to the paying student
+        if (student?.userId) {
+          const studentMsg = `Your payment of ৳${input.amount} for ${input.month} has been recorded.`;
+          await storage.createStudentNotification(student.userId, studentMsg, "payment", "/income");
+          sendPushToUser(student.userId, {
+            title: "Payment Recorded",
+            body: studentMsg,
+            url: "/income",
+            tag: `payment-${income.id}`,
+          }).catch(() => {});
+        }
       } catch (notifErr: any) {
         console.error("[Notification] payment trigger failed:", notifErr.message);
       }
@@ -446,10 +457,23 @@ export async function registerRoutes(
         const allBatches = await storage.getBatches();
         const batch = allBatches.find(b => b.id === data.batchId);
         const teacherName = (req.user as any).username;
-        await storage.createNotification(
-          `${teacherName} has uploaded results for ${batch?.name ?? "a batch"} in ${data.subject}.`,
-          "result"
-        );
+        const adminMsg = `${teacherName} has uploaded results for ${batch?.name ?? "a batch"} in ${data.subject}.`;
+        await storage.createNotification(adminMsg, "result");
+
+        // Send push to all students in the batch
+        const batchStudents = await storage.getStudentsByBatchId(data.batchId);
+        const pushMsg = `New result published: ${data.subject} (${data.examName}) for ${batch?.name ?? "your batch"}.`;
+        for (const s of batchStudents) {
+          if (s.userId) {
+            await storage.createStudentNotification(s.userId, pushMsg, "result", "/marksheet");
+          }
+        }
+        sendPushToBatch(data.batchId, {
+          title: "New Result Published",
+          body: pushMsg,
+          url: "/marksheet",
+          tag: `result-${data.examName}-${data.subject}`,
+        }).catch(() => {});
       } catch (notifErr: any) {
         console.error("[Notification] result upload trigger failed:", notifErr.message);
       }
@@ -533,6 +557,28 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || (req.user as any).role !== "admin") return res.sendStatus(403);
     try {
       const draft = await storage.publishModelTestDraft(req.params.groupId);
+
+      // Push to all students in the batch now that results are visible
+      try {
+        const allBatches = await storage.getBatches();
+        const batch = allBatches.find(b => b.id === draft.batchId);
+        const batchStudents = await storage.getStudentsByBatchId(draft.batchId);
+        const pushMsg = `Model test results for ${draft.examName} (${batch?.name ?? "your batch"}) are now published!`;
+        for (const s of batchStudents) {
+          if (s.userId) {
+            await storage.createStudentNotification(s.userId, pushMsg, "result", "/marksheet");
+          }
+        }
+        sendPushToBatch(draft.batchId, {
+          title: "Model Test Results Available",
+          body: pushMsg,
+          url: "/marksheet",
+          tag: `modeltest-published-${draft.groupId}`,
+        }).catch(() => {});
+      } catch (notifErr: any) {
+        console.error("[Notification] model test publish push failed:", notifErr.message);
+      }
+
       res.json(draft);
     } catch {
       res.status(404).json({ message: "Draft not found" });
@@ -567,16 +613,14 @@ export async function registerRoutes(
       }
       await storage.saveModelTestSubjectMarks(groupId, entries);
 
-      // Notification trigger: model test marks
+      // Notification trigger: model test marks (admin only, no push to students yet — push happens on publish)
       try {
         const allBatches = await storage.getBatches();
         const batch = allBatches.find(b => b.id === entries[0].batchId);
         const teacherName = (req.user as any).username;
         const subject = entries[0].subject;
-        await storage.createNotification(
-          `${teacherName} has uploaded model test results for ${batch?.name ?? "a batch"} in ${subject}.`,
-          "result"
-        );
+        const adminMsg = `${teacherName} has uploaded model test results for ${batch?.name ?? "a batch"} in ${subject}.`;
+        await storage.createNotification(adminMsg, "result");
       } catch (notifErr: any) {
         console.error("[Notification] model test trigger failed:", notifErr.message);
       }
@@ -605,6 +649,59 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || (req.user as any).role !== "admin") return res.sendStatus(403);
     await storage.markAllNotificationsRead();
     res.json({ ok: true });
+  });
+
+  // Student Notifications
+  app.get("/api/student-notifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).id;
+    const notifs = await storage.getStudentNotifications(userId);
+    res.json(notifs);
+  });
+
+  app.get("/api/student-notifications/unread-count", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).id;
+    const count = await storage.getStudentUnreadCount(userId);
+    res.json({ count });
+  });
+
+  app.patch("/api/student-notifications/read-all", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const userId = (req.user as any).id;
+    await storage.markStudentNotificationsRead(userId);
+    res.json({ ok: true });
+  });
+
+  // Push Subscription routes
+  app.get("/api/push/vapid-public-key", (req, res) => {
+    res.json({ key: VAPID_PUBLIC_KEY || "" });
+  });
+
+  app.post("/api/push/subscribe", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { endpoint, keys } = z.object({
+        endpoint: z.string().url(),
+        keys: z.object({ p256dh: z.string(), auth: z.string() }),
+      }).parse(req.body);
+      const userId = (req.user as any).id;
+      const sub = await storage.savePushSubscription(userId, endpoint, keys.p256dh, keys.auth);
+      res.status(201).json({ ok: true });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid subscription data" });
+    }
+  });
+
+  app.post("/api/push/unsubscribe", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { endpoint } = z.object({ endpoint: z.string() }).parse(req.body);
+      await storage.deletePushSubscription(endpoint);
+      res.json({ ok: true });
+    } catch {
+      res.status(400).json({ message: "Invalid request" });
+    }
   });
 
   return httpServer;

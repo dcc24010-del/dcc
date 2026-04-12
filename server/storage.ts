@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { 
   incomes, expenses, batches, students, users, results, modelTestDrafts, notifications, collectionTracking,
+  pushSubscriptions, studentNotifications,
   type Income, type InsertIncome, 
   type Expense, type InsertExpense,
   type Batch, type InsertBatch,
@@ -9,7 +10,9 @@ import {
   type Result, type InsertResult,
   type ModelTestDraft,
   type Notification,
-  type CollectionTracking
+  type CollectionTracking,
+  type PushSubscription,
+  type StudentNotification,
 } from "@shared/schema";
 import { eq, desc, inArray, asc } from "drizzle-orm";
 
@@ -73,6 +76,18 @@ export interface IStorage {
   addToTeacherCollection(teacherId: number, amount: number): Promise<void>;
   resetTeacherCollection(teacherId: number): Promise<void>;
   getAllTeacherCollections(): Promise<{ teacher: User; amount: number; lastUpdated: Date }[]>;
+
+  // Push Subscriptions
+  savePushSubscription(userId: number, endpoint: string, p256dh: string, auth: string): Promise<PushSubscription>;
+  deletePushSubscription(endpoint: string): Promise<void>;
+  getPushSubscriptionsByUserId(userId: number): Promise<PushSubscription[]>;
+
+  // Student Notifications
+  createStudentNotification(userId: number, message: string, type: string, url: string): Promise<StudentNotification>;
+  getStudentNotifications(userId: number): Promise<StudentNotification[]>;
+  getStudentUnreadCount(userId: number): Promise<number>;
+  markStudentNotificationsRead(userId: number): Promise<void>;
+  getStudentsByBatchId(batchId: number): Promise<Student[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -436,6 +451,57 @@ export class DatabaseStorage implements IStorage {
         lastUpdated: col?.lastUpdated ?? new Date(0),
       };
     });
+  }
+
+  async savePushSubscription(userId: number, endpoint: string, p256dh: string, auth: string): Promise<PushSubscription> {
+    const [existing] = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+    if (existing) {
+      const [updated] = await db.update(pushSubscriptions)
+        .set({ userId, p256dh, auth })
+        .where(eq(pushSubscriptions.endpoint, endpoint))
+        .returning();
+      return updated;
+    }
+    const [sub] = await db.insert(pushSubscriptions).values({ userId, endpoint, p256dh, auth }).returning();
+    return sub;
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  async getPushSubscriptionsByUserId(userId: number): Promise<PushSubscription[]> {
+    return await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async createStudentNotification(userId: number, message: string, type: string, url: string): Promise<StudentNotification> {
+    const [notif] = await db.insert(studentNotifications).values({ userId, message, type, url }).returning();
+    return notif;
+  }
+
+  async getStudentNotifications(userId: number): Promise<StudentNotification[]> {
+    return await db.select().from(studentNotifications)
+      .where(eq(studentNotifications.userId, userId))
+      .orderBy(desc(studentNotifications.createdAt))
+      .limit(50);
+  }
+
+  async getStudentUnreadCount(userId: number): Promise<number> {
+    const { count } = await import("drizzle-orm");
+    const { and } = await import("drizzle-orm");
+    const [row] = await db.select({ count: count() }).from(studentNotifications)
+      .where(and(eq(studentNotifications.userId, userId), eq(studentNotifications.isRead, false)));
+    return Number(row?.count ?? 0);
+  }
+
+  async markStudentNotificationsRead(userId: number): Promise<void> {
+    await db.update(studentNotifications)
+      .set({ isRead: true })
+      .where(eq(studentNotifications.userId, userId));
+  }
+
+  async getStudentsByBatchId(batchId: number): Promise<Student[]> {
+    return await db.select().from(students).where(eq(students.batchId, batchId));
   }
 }
 

@@ -1,6 +1,6 @@
 import { Switch, Route, Redirect, Link, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/Dashboard";
@@ -16,16 +16,43 @@ import NotFound from "@/pages/not-found";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { type User } from "@/lib/schemas";
-import { Bell } from "lucide-react";
+import { Bell, BellRing, X } from "lucide-react";
+import { usePushNotifications, useAppBadge } from "@/hooks/use-push-notifications";
+import { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 function NotificationHeader({ user }: { user: User }) {
   const [, setLocation] = useLocation();
+
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread-count"],
     enabled: user?.role === "admin",
     refetchInterval: 30000,
   });
-  const unreadCount = unreadData?.count ?? 0;
+
+  const { data: studentUnreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/student-notifications/unread-count"],
+    enabled: user?.role === "student",
+    refetchInterval: 30000,
+  });
+
+  const adminUnread = unreadData?.count ?? 0;
+  const studentUnread = studentUnreadData?.count ?? 0;
+  const unreadCount = user?.role === "admin" ? adminUnread : studentUnread;
+
+  useAppBadge(unreadCount);
+
+  const handleBellClick = async () => {
+    if (user?.role === "admin") {
+      setLocation("/notifications");
+    } else if (user?.role === "student") {
+      await apiRequest("PATCH", "/api/student-notifications/read-all", {});
+      queryClient.invalidateQueries({ queryKey: ["/api/student-notifications/unread-count"] });
+      setLocation("/marksheet");
+    }
+  };
+
+  const showBell = user?.role === "admin" || user?.role === "student";
 
   return (
     <header className="flex items-center justify-between px-4 h-16 shrink-0 bg-white backdrop-blur-md border-b z-20">
@@ -35,10 +62,10 @@ function NotificationHeader({ user }: { user: User }) {
           Dynamic Coaching Center
         </div>
       </div>
-      {user?.role === "admin" && (
+      {showBell && (
         <button
           data-testid="button-notification-bell"
-          onClick={() => setLocation("/notifications")}
+          onClick={handleBellClick}
           className="relative p-2 rounded-xl hover:bg-primary/5 transition-colors"
         >
           <Bell className="w-6 h-6 text-primary" />
@@ -50,6 +77,54 @@ function NotificationHeader({ user }: { user: User }) {
         </button>
       )}
     </header>
+  );
+}
+
+function NotificationPermissionBanner({ user }: { user: User }) {
+  const [dismissed, setDismissed] = useState(() => {
+    return localStorage.getItem("push-banner-dismissed") === "true";
+  });
+  const { permission, requestPermissionAndSubscribe, isLoading } = usePushNotifications(user.id);
+
+  if (dismissed) return null;
+  if (permission === "granted" || permission === "denied") return null;
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) return null;
+
+  const handleAllow = async () => {
+    const granted = await requestPermissionAndSubscribe();
+    if (granted) {
+      localStorage.setItem("push-banner-dismissed", "true");
+      setDismissed(true);
+    }
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem("push-banner-dismissed", "true");
+    setDismissed(true);
+  };
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 bg-primary/10 border-b border-primary/20 text-sm">
+      <BellRing className="w-4 h-4 text-primary shrink-0" />
+      <span className="flex-1 text-primary font-medium">
+        Enable notifications to get instant alerts for results and payments.
+      </span>
+      <button
+        data-testid="button-allow-notifications"
+        onClick={handleAllow}
+        disabled={isLoading}
+        className="px-3 py-1 rounded-lg bg-primary text-white text-xs font-bold shrink-0 hover:bg-primary/90 transition-colors disabled:opacity-60"
+      >
+        {isLoading ? "Enabling…" : "Allow"}
+      </button>
+      <button
+        data-testid="button-dismiss-notifications"
+        onClick={handleDismiss}
+        className="p-1 rounded-lg hover:bg-primary/10 text-primary/60 shrink-0"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 
@@ -79,6 +154,9 @@ function Router() {
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden relative">
           <NotificationHeader user={user} />
+          {(user.role === "student" || user.role === "teacher") && (
+            <NotificationPermissionBanner user={user} />
+          )}
 
           <main className="flex-1 overflow-auto bg-muted/30 px-2 py-3 md:p-6 pb-28 md:pb-28 w-full">
             <Switch>

@@ -37,7 +37,17 @@ The `shared/` directory contains code used by both frontend and backend:
 - `schema.ts`: Database table definitions and Zod insert schemas
 - `routes.ts`: API route definitions with paths, methods, and response schemas
 
-### Recent Changes (January 26, 2026)
+### Recent Changes (April 12, 2026)
+- Added full **Push Notification** system using Web Push API with VAPID keys (no third-party service).
+- Service Worker registered at `/sw.js` handles background push events and notification clicks with deep-links.
+- New DB tables: `push_subscriptions` (stores user device subscriptions) and `student_notifications` (per-student in-app notification feed).
+- Notification permission banner shown to students and teachers after login.
+- App Badge (`navigator.setAppBadge()`) shows unread count on PWA icon.
+- Students get push notifications when: payment is recorded for them, results are uploaded to their batch, model test results are published.
+- VAPID keys stored as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL` env vars.
+- Student notification bell added to header (complements existing admin bell).
+
+### Previous Changes (January 26, 2026)
 - Rebranded app to **Dynamic Coaching Center**.
 - Updated all currency symbols to **Bangladeshi Taka (৳)**.
 - Replaced default logos with custom coaching center logo.

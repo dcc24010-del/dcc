@@ -42,3 +42,10 @@ build = ["npm", "run", "build"]
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BPecQDvasQrYlLcpoUGGIdobUmDwFHRABK-wNgpjnwYw-Ell0LE41XAYG7EVF-NTucaPoiZGyO_yeGSSy3y87WI"
+VAPID_PRIVATE_KEY = "RQ_VxdIwxH9xjs_9whIFeoHJWEEOWB1uYcqkQfkif9M"
+VAPID_EMAIL = "admin@dynamiccoachingcenter.com"

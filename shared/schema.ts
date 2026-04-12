@@ -87,10 +87,31 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const studentNotifications = pgTable("student_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull(), // "payment" | "result"
+  url: text("url").notNull().default("/"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type ModelTestDraft = typeof modelTestDrafts.$inferSelect;
 export type InsertModelTestDraft = typeof modelTestDrafts.$inferInsert;
 export type CollectionTracking = typeof collectionTracking.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type StudentNotification = typeof studentNotifications.$inferSelect;
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertBatchSchema = createInsertSchema(batches).omit({ id: true });

@@ -8,4 +8,12 @@ window.addEventListener("beforeinstallprompt", (e) => {
   registerInstallPrompt(e);
 });
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
+      console.warn("[SW] Registration failed:", err);
+    });
+  });
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
